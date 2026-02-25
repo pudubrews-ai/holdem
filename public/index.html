@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Texas Hold'em Poker</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <!-- Config Screen -->
+    <div id="screen-config" data-testid="screen-config">
+        <h1>Texas Hold'em Poker</h1>
+
+        <div class="config-field">
+            <label for="config-ai-count">Number of AI Players</label>
+            <input type="number" id="config-ai-count" data-testid="config-ai-count" min="1" max="11" value="5">
+            <div class="config-error" data-testid="config-error-ai-count"></div>
+        </div>
+
+        <div class="config-field">
+            <label for="config-starting-stack">Starting Stack (chips)</label>
+            <input type="number" id="config-starting-stack" data-testid="config-starting-stack" min="100" max="1000000" value="1000">
+            <div class="config-error" data-testid="config-error-starting-stack"></div>
+        </div>
+
+        <div class="config-field">
+            <label for="config-hands-per-level">Hands Per Blind Level</label>
+            <input type="number" id="config-hands-per-level" data-testid="config-hands-per-level" min="1" max="100" value="5">
+            <div class="config-error" data-testid="config-error-hands-per-level"></div>
+        </div>
+
+        <div class="config-field">
+            <label for="config-blind-schedule">Blind Schedule</label>
+            <textarea id="config-blind-schedule" data-testid="config-blind-schedule" rows="6">10/20
+25/50
+50/100
+100/200
+200/400</textarea>
+            <div class="config-error" data-testid="config-error-blind-schedule"></div>
+        </div>
+
+        <button id="config-start-btn" data-testid="config-start-btn" disabled>Start Game</button>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="screen-game" data-testid="screen-game" style="display: none;">
+
+        <div class="table-area">
+            <!-- Hand info -->
+            <div data-testid="hand-info" id="hand-info"></div>
+
+            <!-- Community cards -->
+            <div data-testid="community-cards" id="community-cards">
+                <div data-testid="community-card-0" class="card-slot"></div>
+                <div data-testid="community-card-1" class="card-slot"></div>
+                <div data-testid="community-card-2" class="card-slot"></div>
+                <div data-testid="community-card-3" class="card-slot"></div>
+                <div data-testid="community-card-4" class="card-slot"></div>
+            </div>
+
+            <!-- Pot display -->
+            <div data-testid="pot-display" id="pot-display"></div>
+
+            <!-- Blind display -->
+            <div data-testid="blind-display" id="blind-display"></div>
+
+            <!-- Seat 0 (human player) - always at bottom center -->
+            <div data-testid="seat-0" id="seat-0" class="player-seat seat-human">
+                <div data-testid="seat-0-name" class="seat-name"></div>
+                <div data-testid="seat-0-stack" class="seat-stack"></div>
+                <div data-testid="seat-0-cards" class="seat-cards"></div>
+                <div data-testid="seat-0-bet" class="seat-bet"></div>
+                <div data-testid="seat-0-status" class="seat-status"></div>
+                <div data-testid="seat-0-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 1 -->
+            <div data-testid="seat-1" id="seat-1" class="player-seat" style="display: none;">
+                <div data-testid="seat-1-name" class="seat-name"></div>
+                <div data-testid="seat-1-stack" class="seat-stack"></div>
+                <div data-testid="seat-1-cards" class="seat-cards"></div>
+                <div data-testid="seat-1-bet" class="seat-bet"></div>
+                <div data-testid="seat-1-status" class="seat-status"></div>
+                <div data-testid="seat-1-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 2 -->
+            <div data-testid="seat-2" id="seat-2" class="player-seat" style="display: none;">
+                <div data-testid="seat-2-name" class="seat-name"></div>
+                <div data-testid="seat-2-stack" class="seat-stack"></div>
+                <div data-testid="seat-2-cards" class="seat-cards"></div>
+                <div data-testid="seat-2-bet" class="seat-bet"></div>
+                <div data-testid="seat-2-status" class="seat-status"></div>
+                <div data-testid="seat-2-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 3 -->
+            <div data-testid="seat-3" id="seat-3" class="player-seat" style="display: none;">
+                <div data-testid="seat-3-name" class="seat-name"></div>
+                <div data-testid="seat-3-stack" class="seat-stack"></div>
+                <div data-testid="seat-3-cards" class="seat-cards"></div>
+                <div data-testid="seat-3-bet" class="seat-bet"></div>
+                <div data-testid="seat-3-status" class="seat-status"></div>
+                <div data-testid="seat-3-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 4 -->
+            <div data-testid="seat-4" id="seat-4" class="player-seat" style="display: none;">
+                <div data-testid="seat-4-name" class="seat-name"></div>
+                <div data-testid="seat-4-stack" class="seat-stack"></div>
+                <div data-testid="seat-4-cards" class="seat-cards"></div>
+                <div data-testid="seat-4-bet" class="seat-bet"></div>
+                <div data-testid="seat-4-status" class="seat-status"></div>
+                <div data-testid="seat-4-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 5 -->
+            <div data-testid="seat-5" id="seat-5" class="player-seat" style="display: none;">
+                <div data-testid="seat-5-name" class="seat-name"></div>
+                <div data-testid="seat-5-stack" class="seat-stack"></div>
+                <div data-testid="seat-5-cards" class="seat-cards"></div>
+                <div data-testid="seat-5-bet" class="seat-bet"></div>
+                <div data-testid="seat-5-status" class="seat-status"></div>
+                <div data-testid="seat-5-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 6 -->
+            <div data-testid="seat-6" id="seat-6" class="player-seat" style="display: none;">
+                <div data-testid="seat-6-name" class="seat-name"></div>
+                <div data-testid="seat-6-stack" class="seat-stack"></div>
+                <div data-testid="seat-6-cards" class="seat-cards"></div>
+                <div data-testid="seat-6-bet" class="seat-bet"></div>
+                <div data-testid="seat-6-status" class="seat-status"></div>
+                <div data-testid="seat-6-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 7 -->
+            <div data-testid="seat-7" id="seat-7" class="player-seat" style="display: none;">
+                <div data-testid="seat-7-name" class="seat-name"></div>
+                <div data-testid="seat-7-stack" class="seat-stack"></div>
+                <div data-testid="seat-7-cards" class="seat-cards"></div>
+                <div data-testid="seat-7-bet" class="seat-bet"></div>
+                <div data-testid="seat-7-status" class="seat-status"></div>
+                <div data-testid="seat-7-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 8 -->
+            <div data-testid="seat-8" id="seat-8" class="player-seat" style="display: none;">
+                <div data-testid="seat-8-name" class="seat-name"></div>
+                <div data-testid="seat-8-stack" class="seat-stack"></div>
+                <div data-testid="seat-8-cards" class="seat-cards"></div>
+                <div data-testid="seat-8-bet" class="seat-bet"></div>
+                <div data-testid="seat-8-status" class="seat-status"></div>
+                <div data-testid="seat-8-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 9 -->
+            <div data-testid="seat-9" id="seat-9" class="player-seat" style="display: none;">
+                <div data-testid="seat-9-name" class="seat-name"></div>
+                <div data-testid="seat-9-stack" class="seat-stack"></div>
+                <div data-testid="seat-9-cards" class="seat-cards"></div>
+                <div data-testid="seat-9-bet" class="seat-bet"></div>
+                <div data-testid="seat-9-status" class="seat-status"></div>
+                <div data-testid="seat-9-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 10 -->
+            <div data-testid="seat-10" id="seat-10" class="player-seat" style="display: none;">
+                <div data-testid="seat-10-name" class="seat-name"></div>
+                <div data-testid="seat-10-stack" class="seat-stack"></div>
+                <div data-testid="seat-10-cards" class="seat-cards"></div>
+                <div data-testid="seat-10-bet" class="seat-bet"></div>
+                <div data-testid="seat-10-status" class="seat-status"></div>
+                <div data-testid="seat-10-action" class="seat-action"></div>
+            </div>
+
+            <!-- Seat 11 -->
+            <div data-testid="seat-11" id="seat-11" class="player-seat" style="display: none;">
+                <div data-testid="seat-11-name" class="seat-name"></div>
+                <div data-testid="seat-11-stack" class="seat-stack"></div>
+                <div data-testid="seat-11-cards" class="seat-cards"></div>
+                <div data-testid="seat-11-bet" class="seat-bet"></div>
+                <div data-testid="seat-11-status" class="seat-status"></div>
+                <div data-testid="seat-11-action" class="seat-action"></div>
+            </div>
+
+        </div><!-- end .table-area -->
+
+        <!-- Spectator banner -->
+        <div data-testid="spectator-banner" id="spectator-banner" style="display: none;"></div>
+
+        <!-- Hand result banner -->
+        <div data-testid="hand-result" id="hand-result" style="display: none;"></div>
+
+        <!-- Next hand button -->
+        <button data-testid="next-hand-btn" id="next-hand-btn" style="display: none;">Next Hand</button>
+
+        <!-- Action panel -->
+        <div data-testid="action-panel" id="action-panel" style="display: none;">
+            <button data-testid="action-fold" id="action-fold">Fold</button>
+            <button data-testid="action-check" id="action-check">Check</button>
+            <button data-testid="action-call" id="action-call">Call</button>
+            <input type="number" data-testid="action-raise-input" id="action-raise-input">
+            <button data-testid="action-raise-btn" id="action-raise-btn">Raise</button>
+            <button data-testid="action-allin" id="action-allin">All In</button>
+        </div>
+
+    </div><!-- end #screen-game -->
+
+    <!-- Game Over Screen -->
+    <div id="screen-gameover" data-testid="screen-gameover" style="display: none;">
+        <div data-testid="gameover-message" id="gameover-message"></div>
+        <div data-testid="gameover-standings" id="gameover-standings"></div>
+        <button data-testid="play-again-btn" id="play-again-btn">Play Again</button>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
