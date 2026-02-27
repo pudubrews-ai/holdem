@@ -6,15 +6,20 @@ let currentGameId = null;
 let previousGameState = null;
 let pollingInterval = null;
 let actionInFlight = false;
+let drawSelectedIndices = [];
+
+// 3-Card Poker polling (separate from tournament polling)
+let threecardPollInterval = null;
 
 // ============================================================
 // Screen management
 // ============================================================
-function showScreen(screenId) {
-    document.getElementById('screen-config').style.display = 'none';
-    document.getElementById('screen-game').style.display = 'none';
-    document.getElementById('screen-gameover').style.display = 'none';
-    document.getElementById(screenId).style.display = '';
+function showScreen(name) {
+    var screens = ['screen-config', 'screen-game', 'screen-threecard', 'screen-gameover'];
+    screens.forEach(function(id) {
+        document.getElementById(id).style.display = 'none';
+    });
+    document.getElementById('screen-' + name).style.display = 'block';
 }
 
 // ============================================================
@@ -38,16 +43,44 @@ function parseBlindSchedule(text) {
 }
 
 // ============================================================
-// Config validation
+// Config validation helpers
 // ============================================================
-function validateConfig() {
+function clearAllConfigErrors() {
+    var errorEls = document.querySelectorAll('.config-error');
+    for (var i = 0; i < errorEls.length; i++) {
+        errorEls[i].textContent = '';
+        errorEls[i].style.display = 'none';
+    }
+}
+
+function validateTournamentConfig() {
     var allValid = true;
 
+    // Tournament type error is cleared (threecard check removed from here)
+    var ttError = document.querySelector('[data-testid="config-error-tournament-type"]');
+    ttError.textContent = '';
+    ttError.style.display = 'none';
+
+    var tournamentType = document.querySelector('[data-testid="config-tournament-type"]').value;
+
+    // Update AI count max based on tournament type
+    var aiCountInput = document.querySelector('[data-testid="config-ai-count"]');
+    if (tournamentType === 'fivecard') {
+        aiCountInput.max = '5';
+    } else {
+        aiCountInput.max = '11';
+    }
+
     // AI count
-    var aiCount = parseInt(document.querySelector('[data-testid="config-ai-count"]').value, 10);
+    var aiCount = parseInt(aiCountInput.value, 10);
     var aiError = document.querySelector('[data-testid="config-error-ai-count"]');
-    if (!Number.isInteger(aiCount) || aiCount < 1 || aiCount > 11) {
-        aiError.textContent = 'Number of AI players must be between 1 and 11.';
+    var aiMax = tournamentType === 'fivecard' ? 5 : 11;
+    if (!Number.isInteger(aiCount) || aiCount < 1 || aiCount > aiMax) {
+        if (tournamentType === 'fivecard' && Number.isInteger(aiCount) && aiCount > 5) {
+            aiError.textContent = '5-Card Draw supports a maximum of 5 AI players.';
+        } else {
+            aiError.textContent = 'Number of AI players must be between 1 and ' + aiMax + '.';
+        }
         aiError.style.display = '';
         allValid = false;
     } else {
@@ -92,10 +125,71 @@ function validateConfig() {
         scheduleError.style.display = 'none';
     }
 
-    // Enable/disable start button
     document.querySelector('[data-testid="config-start-btn"]').disabled = !allValid;
-
     return allValid;
+}
+
+function validateThreecardConfig() {
+    var valid = true;
+
+    // 1. Bankroll
+    var bankrollRaw = document.querySelector('[data-testid="config-bankroll"]').value;
+    var bankroll = parseInt(bankrollRaw, 10);
+    var bankrollErrEl = document.querySelector('[data-testid="config-error-bankroll"]');
+    if (!Number.isInteger(bankroll) || String(bankroll) !== String(bankrollRaw).trim() || bankroll < 100 || bankroll > 1000000) {
+        bankrollErrEl.textContent = 'Starting bankroll must be between 100 and 1,000,000.';
+        bankrollErrEl.style.display = '';
+        valid = false;
+    } else {
+        bankrollErrEl.textContent = '';
+        bankrollErrEl.style.display = 'none';
+    }
+
+    // 2. Min bet
+    var minBetRaw = document.querySelector('[data-testid="config-min-bet"]').value;
+    var minBet = parseInt(minBetRaw, 10);
+    var minBetErrEl = document.querySelector('[data-testid="config-error-min-bet"]');
+    if (!Number.isInteger(minBet) || String(minBet) !== String(minBetRaw).trim() || minBet < 1 || minBet > 10000) {
+        minBetErrEl.textContent = 'Minimum bet must be between 1 and 10,000.';
+        minBetErrEl.style.display = '';
+        valid = false;
+    } else {
+        minBetErrEl.textContent = '';
+        minBetErrEl.style.display = 'none';
+    }
+
+    // 3. Max bet
+    var maxBetRaw = document.querySelector('[data-testid="config-max-bet"]').value;
+    var maxBet = parseInt(maxBetRaw, 10);
+    var maxBetErrEl = document.querySelector('[data-testid="config-error-max-bet"]');
+    if (!Number.isInteger(maxBet) || String(maxBet) !== String(maxBetRaw).trim() || maxBet < 1 || maxBet > 500000) {
+        maxBetErrEl.textContent = 'Maximum bet must be between 1 and 500,000.';
+        maxBetErrEl.style.display = '';
+        valid = false;
+    } else {
+        maxBetErrEl.textContent = '';
+        maxBetErrEl.style.display = 'none';
+    }
+
+    // 4. Max >= Min (only if both are individually valid)
+    if (valid && maxBet < minBet) {
+        document.querySelector('[data-testid="config-error-max-bet"]').textContent = 'Maximum bet must be greater than or equal to minimum bet.';
+        document.querySelector('[data-testid="config-error-max-bet"]').style.display = '';
+        valid = false;
+    }
+
+    document.querySelector('[data-testid="config-start-btn"]').disabled = !valid;
+    return valid;
+}
+
+function validateConfig() {
+    var type = document.querySelector('[data-testid="config-tournament-type"]').value;
+
+    if (type === 'threecard') {
+        return validateThreecardConfig();
+    } else {
+        return validateTournamentConfig();
+    }
 }
 
 // ============================================================
@@ -122,8 +216,13 @@ function suitColor(card) {
     return (suit === 'h' || suit === 'd') ? 'red' : 'black';
 }
 
+// Format a card string as rank+suit symbol (e.g. "A♠")
+function formatCardFace(card) {
+    return displayRank(card) + displaySuit(card);
+}
+
 // ============================================================
-// Card rendering
+// Card rendering (tournament screens)
 // ============================================================
 function renderCard(containerEl, card) {
     while (containerEl.firstChild) containerEl.removeChild(containerEl.firstChild);
@@ -152,7 +251,9 @@ function renderSeatCards(player, gameState) {
         return;
     }
 
-    if (player.holeCards && player.holeCards.length === 2) {
+    var expectedCardCount = (gameState.tournamentType === 'fivecard') ? 5 : 2;
+
+    if (player.holeCards && player.holeCards.length > 0) {
         // Show face-up cards (human's own cards, or AI at showdown/hand-complete)
         for (var i = 0; i < player.holeCards.length; i++) {
             var card = player.holeCards[i];
@@ -163,10 +264,10 @@ function renderSeatCards(player, gameState) {
             cardsEl.appendChild(cardSlot);
         }
     } else if (player.id !== 'human' && player.status !== 'folded' && player.status !== 'eliminated') {
-        // AI player with hidden cards — show card backs during active play
-        var activePhases = ['pre-flop', 'flop', 'turn', 'river', 'showdown', 'hand-complete'];
+        // AI player with hidden cards -- show card backs during active play
+        var activePhases = ['pre-flop', 'flop', 'turn', 'river', 'draw', 'post-draw', 'showdown', 'hand-complete'];
         if (activePhases.indexOf(gameState.phase) !== -1) {
-            for (var j = 0; j < 2; j++) {
+            for (var j = 0; j < expectedCardCount; j++) {
                 var backSlot = document.createElement('span');
                 backSlot.className = 'card card-back';
                 backSlot.textContent = '??';
@@ -181,6 +282,14 @@ function renderSeatCards(player, gameState) {
 // Community cards
 // ============================================================
 function renderCommunityCards(communityCards) {
+    var communityArea = document.querySelector('[data-testid="community-cards"]');
+    if (currentGameState && currentGameState.tournamentType === 'fivecard') {
+        communityArea.style.display = 'none';
+        return;
+    } else {
+        communityArea.style.display = '';
+    }
+
     for (var i = 0; i < 5; i++) {
         var slot = document.querySelector('[data-testid="community-card-' + i + '"]');
         // Clear slot
@@ -211,6 +320,132 @@ function renderPotDisplay(pots) {
 function renderBlindDisplay(smallBlind, bigBlind) {
     var blindEl = document.querySelector('[data-testid="blind-display"]');
     blindEl.textContent = 'Blinds: ' + smallBlind + '/' + bigBlind;
+}
+
+// ============================================================
+// Game type label
+// ============================================================
+function renderGameTypeLabel(gameState) {
+    var labelEl = document.querySelector('[data-testid="game-type-label"]');
+    if (!labelEl) return;
+    if (gameState.tournamentType === 'fivecard') {
+        labelEl.textContent = '5-Card Draw';
+    } else {
+        labelEl.textContent = 'Texas Hold\'em';
+    }
+}
+
+// ============================================================
+// Draw panel
+// ============================================================
+function renderDrawPanel(gameState) {
+    var panel = document.querySelector('[data-testid="draw-panel"]');
+
+    // Only show during draw phase when it is the human's turn
+    var humanPlayer = null;
+    for (var i = 0; i < gameState.players.length; i++) {
+        if (gameState.players[i].id === 'human') {
+            humanPlayer = gameState.players[i];
+            break;
+        }
+    }
+
+    var isHumanDrawTurn = (
+        gameState.tournamentType === 'fivecard' &&
+        gameState.phase === 'draw' &&
+        gameState.drawSeat === 0 &&
+        humanPlayer &&
+        humanPlayer.holeCards &&
+        humanPlayer.holeCards.length === 5 &&
+        gameState.humanStatus !== 'spectating'
+    );
+
+    if (!isHumanDrawTurn) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = '';
+
+    // Render each card button
+    for (var c = 0; c < 5; c++) {
+        var cardBtn = document.querySelector('[data-testid="draw-card-' + c + '"]');
+        var card = humanPlayer.holeCards[c];
+        cardBtn.textContent = displayRank(card) + displaySuit(card);
+        cardBtn.style.color = suitColor(card);
+
+        // Preserve selection state -- only reset if this is a new hand
+        // (drawSelectedIndices is managed by click handlers)
+    }
+
+    // Update discard count display
+    var countEl = document.querySelector('[data-testid="draw-discard-count"]');
+    countEl.textContent = 'Discarding: ' + drawSelectedIndices.length + ' card(s)';
+
+    // Update submit button text
+    var submitBtn = document.querySelector('[data-testid="draw-submit-btn"]');
+    if (drawSelectedIndices.length > 0) {
+        submitBtn.textContent = 'Draw ' + drawSelectedIndices.length + ' Card(s)';
+    } else {
+        submitBtn.textContent = 'Stand Pat';
+    }
+}
+
+// ============================================================
+// Draw status
+// ============================================================
+function renderDrawStatus(gameState) {
+    var statusEl = document.querySelector('[data-testid="draw-status"]');
+
+    // Only show during draw phase when it is an AI's turn (not the human's turn)
+    if (gameState.tournamentType !== 'fivecard' ||
+        gameState.phase !== 'draw' ||
+        gameState.drawSeat === null ||
+        gameState.drawSeat === 0) {
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+        return;
+    }
+
+    // Find the player whose turn it is to draw
+    var drawPlayer = null;
+    for (var i = 0; i < gameState.players.length; i++) {
+        if (gameState.players[i].seatIndex === gameState.drawSeat) {
+            drawPlayer = gameState.players[i];
+            break;
+        }
+    }
+
+    if (drawPlayer) {
+        statusEl.style.display = '';
+        statusEl.textContent = drawPlayer.name + ' is drawing...';
+    } else {
+        statusEl.style.display = 'none';
+        statusEl.textContent = '';
+    }
+}
+
+// ============================================================
+// Seat discards
+// ============================================================
+function renderSeatDiscards(player, gameState) {
+    var discardsEl = document.querySelector('[data-testid="seat-' + player.seatIndex + '-discards"]');
+    if (!discardsEl) return;
+
+    if (gameState.tournamentType === 'fivecard' &&
+        player.discardCount !== null && player.discardCount !== undefined &&
+        player.discardCount > 0) {
+        discardsEl.textContent = 'Drew: ' + player.discardCount;
+        discardsEl.style.display = '';
+    } else if (gameState.tournamentType !== 'fivecard') {
+        // Hide entirely in Hold'em games
+        discardsEl.textContent = '';
+        discardsEl.style.display = 'none';
+    } else {
+        // fivecard but discardCount is 0 or null -- show empty
+        discardsEl.textContent = '';
+        discardsEl.style.display = '';
+    }
 }
 
 // ============================================================
@@ -262,6 +497,9 @@ function renderSeat(player, gameState) {
     // Status badge
     var statusEl = document.querySelector('[data-testid="seat-' + player.seatIndex + '-status"]');
     statusEl.textContent = getSeatStatusText(player);
+
+    // Discards display (5-Card Draw only)
+    renderSeatDiscards(player, gameState);
 }
 
 // ============================================================
@@ -337,8 +575,14 @@ function updateActionPanel(gameState) {
             break;
         }
     }
-    var activePhases = ['pre-flop', 'flop', 'turn', 'river'];
+    var activePhases = ['pre-flop', 'flop', 'turn', 'river', 'post-draw'];
     var isHumanTurn = activePhases.indexOf(gameState.phase) !== -1 && gameState.actionSeat === 0;
+
+    // Hide action panel during draw phase (draw panel handles that phase)
+    if (gameState.phase === 'draw') {
+        panel.style.display = 'none';
+        return;
+    }
 
     panel.style.display = isHumanTurn ? '' : 'none';
     if (!isHumanTurn || !humanPlayer) return;
@@ -409,7 +653,11 @@ function renderHandResult(gameState) {
         });
 
         if (winnerNames.length === 1) {
-            line.textContent = winnerNames[0] + ' wins ' + potResult.amount + ' chips';
+            if (winnerNames[0] === 'You') {
+                line.textContent = 'You win ' + potResult.amount + ' chips';
+            } else {
+                line.textContent = winnerNames[0] + ' wins ' + potResult.amount + ' chips';
+            }
         } else {
             line.textContent = winnerNames.join(' and ') + ' split ' + potResult.amount + ' chips';
         }
@@ -444,7 +692,13 @@ function updateSpectatorBanner(gameState) {
 // Game over screen
 // ============================================================
 function renderGameOver(gameState) {
-    showScreen('screen-gameover');
+    if (gameState.tournamentType === 'threecard') {
+        render3CGameOver(gameState);
+        return;
+    }
+
+    // Tournament game-over (unchanged from V2)
+    showScreen('gameover');
     stopPolling();
 
     var msgEl = document.querySelector('[data-testid="gameover-message"]');
@@ -460,6 +714,12 @@ function renderGameOver(gameState) {
         }
         msgEl.textContent = (winner ? winner.name : 'Unknown') + ' wins!';
     }
+
+    // Hide 3-Card-specific elements for tournament game-over
+    var finalBankrollEl = document.querySelector('[data-testid="gameover-final-bankroll"]');
+    var handsPlayedEl = document.querySelector('[data-testid="gameover-hands-played"]');
+    if (finalBankrollEl) finalBankrollEl.style.display = 'none';
+    if (handsPlayedEl) handsPlayedEl.style.display = 'none';
 
     // Standings
     var standingsEl = document.querySelector('[data-testid="gameover-standings"]');
@@ -483,8 +743,32 @@ function renderGameOver(gameState) {
     }
 }
 
+function render3CGameOver(state) {
+    var humanPlayer = state.players.find(function(p) { return p.id === 'human'; });
+    var isBust = state.humanStatus === 'bust';
+
+    document.querySelector('[data-testid="gameover-message"]').textContent =
+        isBust ? 'Busted!' : 'Cashed Out!';
+
+    document.querySelector('[data-testid="gameover-final-bankroll"]').textContent =
+        'Final bankroll: ' + (humanPlayer ? humanPlayer.bankroll : 0) + ' chips';
+
+    document.querySelector('[data-testid="gameover-hands-played"]').textContent =
+        'Hands played: ' + state.handNumber;
+
+    // Show 3-Card-specific elements
+    setVisible('[data-testid="gameover-final-bankroll"]', true);
+    setVisible('[data-testid="gameover-hands-played"]', true);
+
+    // Clear tournament standings for 3-Card game-over
+    var standingsEl = document.querySelector('[data-testid="gameover-standings"]');
+    while (standingsEl.firstChild) standingsEl.removeChild(standingsEl.firstChild);
+
+    showScreen('gameover');
+}
+
 // ============================================================
-// Polling
+// Polling (tournament)
 // ============================================================
 function startPolling() {
     if (pollingInterval) return; // already polling
@@ -513,9 +797,15 @@ function stopPolling() {
 }
 
 // ============================================================
-// Master render function
+// Master render function (tournament + 3-Card routing)
 // ============================================================
 function renderGameState(gameState) {
+    // Route 3-Card Poker to its own renderer
+    if (gameState.tournamentType === 'threecard') {
+        render3CGameState(gameState);
+        return;
+    }
+
     // Store previous state for action label diffing
     var prevState = previousGameState;
     previousGameState = JSON.parse(JSON.stringify(gameState)); // deep clone
@@ -529,12 +819,18 @@ function renderGameState(gameState) {
     // Ensure game screen is visible (not gameover screen)
     // Only switch if we are not already on game screen
     if (document.getElementById('screen-game').style.display === 'none') {
-        showScreen('screen-game');
+        showScreen('game');
     }
 
-    // Clear action labels on new hand
+    // Clear action labels and reset draw selection on new hand
     if (!prevState || prevState.handNumber !== gameState.handNumber) {
         clearActionLabels();
+        drawSelectedIndices = [];
+        // Reset draw card button states
+        for (var dc = 0; dc < 5; dc++) {
+            var drawCardBtn = document.querySelector('[data-testid="draw-card-' + dc + '"]');
+            if (drawCardBtn) drawCardBtn.setAttribute('data-selected', 'false');
+        }
     } else {
         updateActionLabels(prevState, gameState);
     }
@@ -544,8 +840,9 @@ function renderGameState(gameState) {
     renderCommunityCards(gameState.communityCards);
     renderPotDisplay(gameState.pots);
     renderBlindDisplay(gameState.smallBlind, gameState.bigBlind);
+    renderGameTypeLabel(gameState);
 
-    // Render all seats — first hide all, then show active players
+    // Render all seats -- first hide all, then show active players
     for (var i = 0; i < 12; i++) {
         var seatEl = document.querySelector('[data-testid="seat-' + i + '"]');
         if (seatEl) seatEl.style.display = 'none';
@@ -560,6 +857,10 @@ function renderGameState(gameState) {
     // Action panel
     updateActionPanel(gameState);
 
+    // Draw panel and draw status (5-Card Draw only)
+    renderDrawPanel(gameState);
+    renderDrawStatus(gameState);
+
     // Hand result banner
     renderHandResult(gameState);
 
@@ -572,15 +873,20 @@ function renderGameState(gameState) {
     // Polling control
     if (gameState.phase === 'hand-complete') {
         if (gameState.humanStatus === 'spectating') {
-            // Keep polling — server will auto-advance after 5 seconds
+            // Keep polling -- server will auto-advance after 5 seconds
         } else {
             stopPolling();
         }
+    } else if (gameState.phase === 'draw' &&
+               gameState.drawSeat === 0 &&
+               gameState.humanStatus !== 'spectating') {
+        // Stop polling when draw panel is visible (human is choosing discards)
+        stopPolling();
     }
 }
 
 // ============================================================
-// sendAction — with debouncing
+// sendAction -- with debouncing
 // ============================================================
 function sendAction(action, amount) {
     if (actionInFlight) return; // prevent double-sends
@@ -638,39 +944,383 @@ function sendAction(action, amount) {
 }
 
 // ============================================================
-// Event listeners — attached once at initialization
+// sendDraw
+// ============================================================
+function sendDraw(discards) {
+    if (actionInFlight) return;
+    actionInFlight = true;
+
+    // Stop polling while draw is in flight
+    stopPolling();
+
+    // Hide draw panel immediately to prevent double-submits
+    document.querySelector('[data-testid="draw-panel"]').style.display = 'none';
+
+    fetch('/api/draw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: currentGameId, discards: discards })
+    })
+    .then(function(response) {
+        return response.json().then(function(data) {
+            return { ok: response.ok, data: data };
+        });
+    })
+    .then(function(result) {
+        if (result.ok) {
+            currentGameState = result.data;
+            drawSelectedIndices = []; // reset selection
+            renderGameState(result.data);
+        } else {
+            console.error('Draw error:', result.data.error);
+            // Re-show draw panel so user can try again
+            if (currentGameState) {
+                renderDrawPanel(currentGameState);
+            }
+        }
+    })
+    .catch(function(err) {
+        console.error('Network error:', err);
+    })
+    .finally(function() {
+        actionInFlight = false;
+        // Resume polling unless at hand-complete or game-over
+        if (currentGameState &&
+            currentGameState.phase !== 'hand-complete' &&
+            currentGameState.phase !== 'game-over') {
+            startPolling();
+        }
+        if (currentGameState &&
+            currentGameState.phase === 'hand-complete' &&
+            currentGameState.humanStatus === 'spectating') {
+            startPolling();
+        }
+    });
+}
+
+// ============================================================
+// 3-Card Poker: utility
+// ============================================================
+function setVisible(selector, visible) {
+    var el = document.querySelector(selector);
+    if (el) el.style.display = visible ? 'block' : 'none';
+}
+
+// Client-side 3-card hand name evaluator (mirrors server's getThreeCardHandName).
+// Returns a display-friendly hand name from a 3-card array e.g. ["Ah","Kd","Qc"].
+function getThreeCardHandNameClient(cards) {
+    var rankOrder = 'AKQJT98765432';
+    var suits = cards.map(function(c) { return c[1]; });
+    var isFlush = suits.every(function(s) { return s === suits[0]; });
+
+    // Straight detection (mirrors server's isThreeCardStraight)
+    var rankIndices = cards.map(function(c) { return rankOrder.indexOf(c[0]); });
+    var sorted = rankIndices.slice().sort(function(a, b) { return a - b; });
+    var isStraight = (sorted[2] - sorted[0] === 2 && sorted[1] - sorted[0] === 1);
+    // A-2-3 (ace-low straight): rankOrder 'AKQJT98765432' gives A=0, 3=11, 2=12, so sorted=[0,11,12]
+    if (!isStraight && sorted[0] === 0 && sorted[1] === 11 && sorted[2] === 12) {
+        isStraight = true;
+    }
+
+    // Rank counts for pair / trips
+    var rankCounts = {};
+    rankIndices.forEach(function(r) { rankCounts[r] = (rankCounts[r] || 0) + 1; });
+    var counts = Object.values(rankCounts).sort(function(a, b) { return b - a; });
+    var isTrips = counts[0] === 3;
+    var isPair  = counts[0] === 2;
+
+    if (isStraight && isFlush) return 'Straight Flush';
+    if (isTrips)  return 'Three of a Kind';
+    if (isStraight) return 'Straight';
+    if (isFlush)  return 'Flush';
+    if (isPair)   return 'Pair';
+    return 'High Card';
+}
+
+// ============================================================
+// 3-Card Poker: polling
+// ============================================================
+function startThreecardPolling(state) {
+    stopThreecardPolling(); // clear any existing interval first
+
+    var pollPhases = ['dealing', 'resolution'];
+    if (pollPhases.indexOf(state.phase) === -1) {
+        // Fix 4: If game is over, route to game-over screen before returning
+        if (state.phase === 'game-over') {
+            renderGameOver(state);
+        }
+        return; // do not poll during betting, hand-complete, or game-over
+    }
+
+    threecardPollInterval = setInterval(function() {
+        fetch('/api/game')
+            .then(function(resp) {
+                if (!resp.ok) return null;
+                return resp.json();
+            })
+            .then(function(data) {
+                if (!data) return;
+                render3CGameState(data);
+                // Stop polling when phase leaves the polling phases
+                if (pollPhases.indexOf(data.phase) === -1) {
+                    stopThreecardPolling();
+                }
+                // If game over, transition to game-over screen
+                if (data.phase === 'game-over') {
+                    stopThreecardPolling();
+                    renderGameOver(data);
+                }
+            })
+            .catch(function() {
+                // Ignore polling errors silently
+            });
+    }, 1000);
+}
+
+function stopThreecardPolling() {
+    if (threecardPollInterval !== null) {
+        clearInterval(threecardPollInterval);
+        threecardPollInterval = null;
+    }
+}
+
+// ============================================================
+// 3-Card Poker: master render function
+// ============================================================
+function render3CGameState(state) {
+    // Fix 1: Guard — if game is over, route to game-over screen immediately
+    if (state.phase === 'game-over' || state.humanStatus === 'bust' || state.humanStatus === 'cashedout') {
+        renderGameOver(state);
+        return;
+    }
+
+    var phase = state.phase;
+
+    // Header
+    document.querySelector('[data-testid="tc-game-label"]').textContent = '3-Card Poker';
+    document.querySelector('[data-testid="tc-hand-number"]').textContent = 'Hand ' + state.handNumber;
+    document.querySelector('[data-testid="tc-table-limits"]').textContent =
+        'Min: ' + state.config.minBet + ' | Max: ' + state.config.maxBet;
+
+    // Dealer area
+    var revealDealer = phase === 'resolution' || phase === 'hand-complete';
+    for (var i = 0; i < 3; i++) {
+        var dealerCardEl = document.querySelector('[data-testid="tc-dealer-card-' + i + '"]');
+        if (revealDealer && state.dealer.cards && state.dealer.cards[i]) {
+            dealerCardEl.textContent = formatCardFace(state.dealer.cards[i]);
+        } else {
+            dealerCardEl.textContent = '[card]';
+        }
+    }
+    var dealerStatusEl = document.querySelector('[data-testid="tc-dealer-status"]');
+    if (revealDealer && state.dealer.qualifies !== null) {
+        dealerStatusEl.textContent = state.dealer.qualifies ? 'Qualifies' : 'Does Not Qualify';
+    } else {
+        dealerStatusEl.textContent = '';
+    }
+
+    // Player seats
+    state.players.forEach(function(player) {
+        var n = player.seatIndex;
+        document.querySelector('[data-testid="tc-seat-' + n + '-name"]').textContent = player.name;
+        document.querySelector('[data-testid="tc-seat-' + n + '-bankroll"]').textContent = player.bankroll + ' chips';
+
+        // Cards: shown face-up for all players (except during "betting" phase when cards are null)
+        for (var c = 0; c < 3; c++) {
+            var cardEl = document.querySelector('[data-testid="tc-seat-' + n + '-card-' + c + '"]');
+            if (player.cards && player.cards[c]) {
+                cardEl.textContent = formatCardFace(player.cards[c]);
+            } else {
+                cardEl.textContent = '';
+            }
+        }
+
+        // Bets
+        document.querySelector('[data-testid="tc-seat-' + n + '-ante"]').textContent =
+            player.anteBet > 0 ? 'Ante: ' + player.anteBet : '';
+        document.querySelector('[data-testid="tc-seat-' + n + '-play"]').textContent =
+            player.playBet > 0 ? 'Play: ' + player.playBet : '';
+        document.querySelector('[data-testid="tc-seat-' + n + '-pairplus"]').textContent =
+            player.pairPlusBet > 0 ? 'Pair+: ' + player.pairPlusBet : '';
+        document.querySelector('[data-testid="tc-seat-' + n + '-sixcard"]').textContent =
+            player.sixCardBet > 0 ? '6-Card: ' + player.sixCardBet : '';
+
+        // Result: shown during resolution and hand-complete
+        var resultEl = document.querySelector('[data-testid="tc-seat-' + n + '-result"]');
+        if ((phase === 'resolution' || phase === 'hand-complete') && player.handResult) {
+            var net = player.handResult.netChange;
+            resultEl.textContent = (net >= 0 ? '+' : '') + net;
+        } else {
+            resultEl.textContent = '';
+        }
+
+        // Status
+        var statusEl = document.querySelector('[data-testid="tc-seat-' + n + '-status"]');
+        if (player.folded) {
+            statusEl.textContent = 'FOLDED';
+        } else if (player.status === 'bust') {
+            statusEl.textContent = 'BUST';
+        } else {
+            statusEl.textContent = '';
+        }
+    });
+
+    var humanPlayer = state.players.find(function(p) { return p.id === 'human'; });
+
+    // Panel visibility
+    setVisible('[data-testid="tc-bet-panel"]', phase === 'betting');
+    setVisible('[data-testid="tc-play-panel"]', phase === 'dealing');
+    setVisible('[data-testid="tc-results-panel"]', phase === 'resolution' || phase === 'hand-complete');
+    setVisible('[data-testid="tc-next-hand-btn"]', phase === 'hand-complete');
+
+    var showCashOut = phase === 'betting' || phase === 'hand-complete';
+    setVisible('[data-testid="tc-cashout-btn"]', showCashOut);
+    if (showCashOut && humanPlayer) {
+        document.querySelector('[data-testid="tc-cashout-btn"]').textContent =
+            'Cash Out (' + humanPlayer.bankroll + ' chips)';
+    }
+
+    // Bet panel content
+    if (phase === 'betting' && humanPlayer) {
+        // Clear per-hand display elements when a new hand's betting phase begins
+        document.querySelector('[data-testid="tc-human-hand-name"]').textContent = '';
+        document.querySelector('[data-testid="tc-human-bankroll"]').textContent =
+            'Bankroll: ' + humanPlayer.bankroll;
+        var anteInput = document.querySelector('[data-testid="tc-ante-input"]');
+        anteInput.min = state.config.minBet;
+        anteInput.max = state.config.maxBet;
+        var ppInput = document.querySelector('[data-testid="tc-pairplus-input"]');
+        ppInput.min = 0;
+        ppInput.max = state.config.maxBet;
+        var scInput = document.querySelector('[data-testid="tc-sixcard-input"]');
+        scInput.min = 0;
+        scInput.max = state.config.maxBet;
+    }
+
+    // Play panel content
+    if (phase === 'dealing' && humanPlayer) {
+        document.querySelector('[data-testid="tc-play-btn"]').textContent =
+            'Play (costs ' + humanPlayer.anteBet + ')';
+        document.querySelector('[data-testid="tc-fold-btn"]').textContent =
+            'Fold (forfeit ' + humanPlayer.anteBet + ')';
+    }
+
+    // Results panel content
+    if ((phase === 'resolution' || phase === 'hand-complete') && humanPlayer && humanPlayer.handResult) {
+        var hr = humanPlayer.handResult;
+        var netChange = hr.netChange;
+
+        document.querySelector('[data-testid="tc-results-net"]').textContent =
+            (netChange >= 0 ? '+' : '') + netChange + ' chips';
+
+        document.querySelector('[data-testid="tc-dealer-hand-name"]').textContent =
+            state.dealer.qualifies !== null
+                ? (state.dealer.qualifies ? 'Dealer qualifies' : 'Dealer does not qualify')
+                : '';
+
+        document.querySelector('[data-testid="tc-human-hand-name"]').textContent =
+            humanPlayer.cards ? getThreeCardHandNameClient(humanPlayer.cards) : '';
+
+        // Build results summary
+        var parts = [];
+        if (hr.anteResult === 'win') parts.push('Ante: +' + humanPlayer.anteBet);
+        else if (hr.anteResult === 'loss') parts.push('Ante: -' + humanPlayer.anteBet);
+        else if (hr.anteResult === 'push') parts.push('Ante: push');
+        if (hr.playResult === 'win') parts.push('Play: +' + humanPlayer.playBet);
+        else if (hr.playResult === 'loss') parts.push('Play: -' + humanPlayer.playBet);
+        else if (hr.playResult === 'push') parts.push('Play: push');
+        if (hr.anteBonus > 0) parts.push('Ante Bonus: +' + hr.anteBonus);
+        if (hr.pairPlusResult === 'win') parts.push('Pair Plus: +' + hr.pairPlusPayout);
+        else if (hr.pairPlusResult === 'loss') parts.push('Pair Plus: -' + humanPlayer.pairPlusBet);
+        if (hr.sixCardResult === 'win') parts.push('Six Card: +' + hr.sixCardPayout);
+        else if (hr.sixCardResult === 'loss') parts.push('Six Card: -' + humanPlayer.sixCardBet);
+        document.querySelector('[data-testid="tc-results-summary"]').textContent = parts.join(', ');
+    }
+}
+
+// ============================================================
+// Event listeners -- attached once at initialization
 // ============================================================
 
-// Config field blur validation
+// Tournament type change listener: show/hide field groups and re-validate
+document.querySelector('[data-testid="config-tournament-type"]').addEventListener('change', function() {
+    var type = document.querySelector('[data-testid="config-tournament-type"]').value;
+    var tournamentFields = document.getElementById('tournament-config-fields');
+    var threecardFields = document.getElementById('threecard-config-fields');
+
+    if (type === 'threecard') {
+        tournamentFields.style.display = 'none';
+        threecardFields.style.display = 'block';
+        // Clear tournament error divs
+        var ttError = document.querySelector('[data-testid="config-error-tournament-type"]');
+        ttError.textContent = '';
+        ttError.style.display = 'none';
+    } else {
+        threecardFields.style.display = 'none';
+        tournamentFields.style.display = 'block';
+        // Clear 3-Card error divs
+        document.querySelector('[data-testid="config-error-bankroll"]').textContent = '';
+        document.querySelector('[data-testid="config-error-bankroll"]').style.display = 'none';
+        document.querySelector('[data-testid="config-error-min-bet"]').textContent = '';
+        document.querySelector('[data-testid="config-error-min-bet"]').style.display = 'none';
+        document.querySelector('[data-testid="config-error-max-bet"]').textContent = '';
+        document.querySelector('[data-testid="config-error-max-bet"]').style.display = 'none';
+    }
+    validateConfig();
+});
+
+// Config field blur/input validation (tournament fields)
 document.querySelector('[data-testid="config-ai-count"]').addEventListener('blur', validateConfig);
 document.querySelector('[data-testid="config-starting-stack"]').addEventListener('blur', validateConfig);
 document.querySelector('[data-testid="config-hands-per-level"]').addEventListener('blur', validateConfig);
 document.querySelector('[data-testid="config-blind-schedule"]').addEventListener('blur', validateConfig);
 
-// Also validate on input changes for better UX
 document.querySelector('[data-testid="config-ai-count"]').addEventListener('input', validateConfig);
 document.querySelector('[data-testid="config-starting-stack"]').addEventListener('input', validateConfig);
 document.querySelector('[data-testid="config-hands-per-level"]').addEventListener('input', validateConfig);
 document.querySelector('[data-testid="config-blind-schedule"]').addEventListener('input', validateConfig);
 
+// Config field blur/input validation (3-Card Poker fields)
+document.querySelector('[data-testid="config-bankroll"]').addEventListener('blur', validateConfig);
+document.querySelector('[data-testid="config-min-bet"]').addEventListener('blur', validateConfig);
+document.querySelector('[data-testid="config-max-bet"]').addEventListener('blur', validateConfig);
+
+document.querySelector('[data-testid="config-bankroll"]').addEventListener('input', validateConfig);
+document.querySelector('[data-testid="config-min-bet"]').addEventListener('input', validateConfig);
+document.querySelector('[data-testid="config-max-bet"]').addEventListener('input', validateConfig);
+
 // Start Game button
 document.querySelector('[data-testid="config-start-btn"]').addEventListener('click', function() {
     if (!validateConfig()) return;
 
-    var aiCount = parseInt(document.querySelector('[data-testid="config-ai-count"]').value, 10);
-    var startingStack = parseInt(document.querySelector('[data-testid="config-starting-stack"]').value, 10);
-    var handsPerLevel = parseInt(document.querySelector('[data-testid="config-hands-per-level"]').value, 10);
-    var blindSchedule = parseBlindSchedule(document.querySelector('[data-testid="config-blind-schedule"]').value);
+    var type = document.querySelector('[data-testid="config-tournament-type"]').value;
+    var body;
 
-    fetch('/api/game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    if (type === 'threecard') {
+        body = {
+            tournamentType: 'threecard',
+            bankroll: parseInt(document.querySelector('[data-testid="config-bankroll"]').value, 10),
+            minBet: parseInt(document.querySelector('[data-testid="config-min-bet"]').value, 10),
+            maxBet: parseInt(document.querySelector('[data-testid="config-max-bet"]').value, 10)
+        };
+    } else {
+        var aiCount = parseInt(document.querySelector('[data-testid="config-ai-count"]').value, 10);
+        var startingStack = parseInt(document.querySelector('[data-testid="config-starting-stack"]').value, 10);
+        var handsPerLevel = parseInt(document.querySelector('[data-testid="config-hands-per-level"]').value, 10);
+        var blindSchedule = parseBlindSchedule(document.querySelector('[data-testid="config-blind-schedule"]').value);
+        body = {
+            tournamentType: type,
             aiCount: aiCount,
             startingStack: startingStack,
             handsPerLevel: handsPerLevel,
             blindSchedule: blindSchedule
-        })
+        };
+    }
+
+    fetch('/api/game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
     })
     .then(function(response) {
         return response.json().then(function(data) {
@@ -682,20 +1332,27 @@ document.querySelector('[data-testid="config-start-btn"]').addEventListener('cli
             console.error('Game start failed:', result.data.error);
             return;
         }
-        var gameData = result.data;
-        currentGameState = gameData;
-        currentGameId = gameData.gameId;
+        var state = result.data;
+        currentGameState = state;
+        currentGameId = state.gameId;
         previousGameState = null;
-        showScreen('screen-game');
-        renderGameState(gameData);
-        startPolling();
+
+        if (state.tournamentType === 'threecard') {
+            showScreen('threecard');
+            render3CGameState(state);
+            // Do NOT start polling — initial phase is "betting" which requires human input
+        } else {
+            showScreen('game');
+            renderGameState(state);
+            startPolling();
+        }
     })
     .catch(function(err) {
         console.error('Network error:', err);
     });
 });
 
-// Action buttons
+// Action buttons (tournament)
 document.querySelector('[data-testid="action-fold"]').addEventListener('click', function() {
     sendAction('fold');
 });
@@ -717,7 +1374,65 @@ document.querySelector('[data-testid="action-allin"]').addEventListener('click',
     sendAction('allin');
 });
 
-// Next hand button
+// Draw card toggle handlers (5-Card Draw)
+for (var drawIdx = 0; drawIdx < 5; drawIdx++) {
+    (function(idx) {
+        document.querySelector('[data-testid="draw-card-' + idx + '"]').addEventListener('click', function() {
+            var btn = document.querySelector('[data-testid="draw-card-' + idx + '"]');
+            var isSelected = btn.getAttribute('data-selected') === 'true';
+
+            if (isSelected) {
+                // Deselect
+                btn.setAttribute('data-selected', 'false');
+                var pos = drawSelectedIndices.indexOf(idx);
+                if (pos !== -1) drawSelectedIndices.splice(pos, 1);
+            } else {
+                // Select -- but enforce max 3
+                if (drawSelectedIndices.length >= 3) return; // do nothing if 3 already selected
+                btn.setAttribute('data-selected', 'true');
+                drawSelectedIndices.push(idx);
+            }
+
+            // Update discard count display
+            var countEl = document.querySelector('[data-testid="draw-discard-count"]');
+            countEl.textContent = 'Discarding: ' + drawSelectedIndices.length + ' card(s)';
+
+            // Update submit button text
+            var submitBtn = document.querySelector('[data-testid="draw-submit-btn"]');
+            if (drawSelectedIndices.length > 0) {
+                submitBtn.textContent = 'Draw ' + drawSelectedIndices.length + ' Card(s)';
+            } else {
+                submitBtn.textContent = 'Stand Pat';
+            }
+        });
+    })(drawIdx);
+}
+
+// Draw submit handler
+document.querySelector('[data-testid="draw-submit-btn"]').addEventListener('click', function() {
+    if (!currentGameState || !currentGameState.players) return;
+    var humanPlayer = null;
+    for (var i = 0; i < currentGameState.players.length; i++) {
+        if (currentGameState.players[i].id === 'human') {
+            humanPlayer = currentGameState.players[i];
+            break;
+        }
+    }
+    if (!humanPlayer || !humanPlayer.holeCards) return;
+
+    // Build discards array from selected indices
+    var discards = [];
+    for (var j = 0; j < drawSelectedIndices.length; j++) {
+        var cardIdx = drawSelectedIndices[j];
+        if (cardIdx >= 0 && cardIdx < humanPlayer.holeCards.length) {
+            discards.push(humanPlayer.holeCards[cardIdx]);
+        }
+    }
+
+    sendDraw(discards);
+});
+
+// Next hand button (tournament)
 document.querySelector('[data-testid="next-hand-btn"]').addEventListener('click', function() {
     fetch('/api/next-hand', {
         method: 'POST',
@@ -747,24 +1462,189 @@ document.querySelector('[data-testid="next-hand-btn"]').addEventListener('click'
 // Play Again button
 document.querySelector('[data-testid="play-again-btn"]').addEventListener('click', function() {
     stopPolling();
+    stopThreecardPolling();
     currentGameState = null;
     currentGameId = null;
     previousGameState = null;
     actionInFlight = false;
-    showScreen('screen-config');
+    showScreen('config');
+    // Reset tournament type and show tournament fields
+    document.querySelector('[data-testid="config-tournament-type"]').value = 'holdem';
+    document.getElementById('tournament-config-fields').style.display = 'block';
+    document.getElementById('threecard-config-fields').style.display = 'none';
+    // Reset AI count max back to 11
+    document.querySelector('[data-testid="config-ai-count"]').max = '11';
+    // Reset draw state
+    drawSelectedIndices = [];
     // Reset config form to defaults
     document.querySelector('[data-testid="config-ai-count"]').value = '5';
     document.querySelector('[data-testid="config-starting-stack"]').value = '1000';
     document.querySelector('[data-testid="config-hands-per-level"]').value = '5';
     document.querySelector('[data-testid="config-blind-schedule"]').value = '10/20\n25/50\n50/100\n100/200\n200/400';
-    // Clear errors
+    // Reset 3-Card fields to defaults
+    document.querySelector('[data-testid="config-bankroll"]').value = '1000';
+    document.querySelector('[data-testid="config-min-bet"]').value = '5';
+    document.querySelector('[data-testid="config-max-bet"]').value = '500';
+    // Clear all errors
     var errorEls = document.querySelectorAll('.config-error');
     for (var i = 0; i < errorEls.length; i++) {
         errorEls[i].textContent = '';
         errorEls[i].style.display = 'none';
     }
+    // Hide 3-Card gameover elements
+    var finalBankrollEl = document.querySelector('[data-testid="gameover-final-bankroll"]');
+    var handsPlayedEl = document.querySelector('[data-testid="gameover-hands-played"]');
+    if (finalBankrollEl) finalBankrollEl.style.display = 'none';
+    if (handsPlayedEl) handsPlayedEl.style.display = 'none';
     // Re-validate to set button state
     validateConfig();
+});
+
+// ============================================================
+// 3-Card Poker button handlers
+// ============================================================
+
+// Place Bets button
+document.querySelector('[data-testid="tc-place-bets-btn"]').addEventListener('click', function() {
+    var anteBet = parseInt(document.querySelector('[data-testid="tc-ante-input"]').value, 10);
+    var pairPlusBet = parseInt(document.querySelector('[data-testid="tc-pairplus-input"]').value, 10) || 0;
+    var sixCardBet = parseInt(document.querySelector('[data-testid="tc-sixcard-input"]').value, 10) || 0;
+    var body = { gameId: currentGameId, anteBet: anteBet, pairPlusBet: pairPlusBet, sixCardBet: sixCardBet };
+    fetch('/api/3c-bet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    })
+    .then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (result.ok) {
+            currentGameState = result.data;
+            render3CGameState(result.data);
+            startThreecardPolling(result.data);
+        } else {
+            console.error('Bet error:', result.data.error);
+        }
+    })
+    .catch(function(err) {
+        console.error('Network error:', err);
+    });
+});
+
+// Clear Bets button
+document.querySelector('[data-testid="tc-clear-bets-btn"]').addEventListener('click', function() {
+    document.querySelector('[data-testid="tc-ante-input"]').value = '';
+    document.querySelector('[data-testid="tc-pairplus-input"]').value = '0';
+    document.querySelector('[data-testid="tc-sixcard-input"]').value = '0';
+});
+
+// Play button
+document.querySelector('[data-testid="tc-play-btn"]').addEventListener('click', function() {
+    fetch('/api/3c-play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: currentGameId, decision: 'play' })
+    })
+    .then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (result.ok) {
+            currentGameState = result.data;
+            // Fix 3: Check for game-over before delegating to render3CGameState
+            if (result.data.phase === 'game-over') {
+                renderGameOver(result.data);
+                stopThreecardPolling();
+                return;
+            }
+            render3CGameState(result.data);
+            startThreecardPolling(result.data);
+        } else {
+            console.error('Play error:', result.data.error);
+        }
+    })
+    .catch(function(err) {
+        console.error('Network error:', err);
+    });
+});
+
+// Fold button
+document.querySelector('[data-testid="tc-fold-btn"]').addEventListener('click', function() {
+    fetch('/api/3c-play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: currentGameId, decision: 'fold' })
+    })
+    .then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (result.ok) {
+            currentGameState = result.data;
+            // Fix 2: Check for game-over before delegating to render3CGameState
+            if (result.data.phase === 'game-over') {
+                renderGameOver(result.data);
+                stopThreecardPolling();
+                return;
+            }
+            render3CGameState(result.data);
+            startThreecardPolling(result.data);
+        } else {
+            console.error('Fold error:', result.data.error);
+        }
+    })
+    .catch(function(err) {
+        console.error('Network error:', err);
+    });
+});
+
+// Next Hand button (3-Card)
+document.querySelector('[data-testid="tc-next-hand-btn"]').addEventListener('click', function() {
+    fetch('/api/3c-next-hand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: currentGameId })
+    })
+    .then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (result.ok) {
+            currentGameState = result.data;
+            render3CGameState(result.data);
+            // Do NOT start polling — new phase is "betting" which requires human input
+        } else {
+            console.error('Next hand error:', result.data.error);
+        }
+    })
+    .catch(function(err) {
+        console.error('Network error:', err);
+    });
+});
+
+// Cash Out button
+document.querySelector('[data-testid="tc-cashout-btn"]').addEventListener('click', function() {
+    fetch('/api/3c-cashout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: currentGameId })
+    })
+    .then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (result.ok) {
+            stopThreecardPolling();
+            currentGameState = result.data;
+            renderGameOver(result.data);
+        } else {
+            console.error('Cash out error:', result.data.error);
+        }
+    })
+    .catch(function(err) {
+        console.error('Network error:', err);
+    });
 });
 
 // ============================================================

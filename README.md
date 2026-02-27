@@ -1,10 +1,11 @@
-# Texas Hold'em Poker
+# Poker — Texas Hold'em & 5-Card Draw
 
-A locally-run, single-page web app for No-Limit Texas Hold'em. Play against 1–11 AI opponents in a tournament format — last player with chips wins.
+A locally-run, single-page web app supporting No-Limit Texas Hold'em and No-Limit 5-Card Draw. Play against up to 11 AI opponents (or 5 in 5-Card Draw) in a tournament format — last player with chips wins.
 
 ## Features
 
-- **1–11 AI opponents** — each assigned a random skill tier (loose-passive, tight-aggressive, loose-aggressive) with distinct betting strategies
+- **Two game types** — Texas Hold'em No-Limit and 5-Card Draw No-Limit
+- **1–11 AI opponents** (1–5 in 5-Card Draw) — each assigned a random skill tier (loose-passive, tight-aggressive, loose-aggressive) with distinct betting strategies
 - **Full tournament rules** — blinds increase on a configurable schedule, play until one player holds all the chips
 - **Side pot support** — correct multi-player all-in handling with separate side pot calculation
 - **Spectator mode** — when you bust out, watch the AI finish the game
@@ -39,7 +40,8 @@ Before each game you can set:
 
 | Setting | Default | Range |
 |---|---|---|
-| Number of AI players | 5 | 1–11 |
+| Tournament type | Texas Hold'em | Hold'em or 5-Card Draw |
+| Number of AI players | 5 | 1–11 (1–5 for 5-Card Draw) |
 | Starting stack | 1,000 chips | 100–1,000,000 |
 | Hands per blind level | 5 | 1–100 |
 | Blind schedule | 10/20 → 200/400 | min 2 levels |

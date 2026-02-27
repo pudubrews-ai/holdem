@@ -66,6 +66,26 @@ body {
     border-color: #5588ff;
 }
 
+.config-field select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #2a2a3e;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+.config-field select:focus {
+    outline: none;
+    border-color: #5588ff;
+}
+
 .config-error {
     color: #ff4444;
     font-size: 13px;
@@ -137,7 +157,7 @@ body {
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-/* Human player seat — always visible, visually distinct */
+/* Human player seat -- always visible, visually distinct */
 .seat-human {
     border-color: #f0c040;
     background: rgba(0, 0, 0, 0.78);
@@ -153,69 +173,69 @@ body {
    Seat positions around the oval table
    ============================================================ */
 
-/* Seat 0 (human) — bottom center, slightly outside table */
+/* Seat 0 (human) -- bottom center, slightly outside table */
 #seat-0 {
     bottom: -70px;
     left: 50%;
     transform: translateX(-50%);
 }
 
-/* Seat 1 — bottom left area */
+/* Seat 1 -- bottom left area */
 #seat-1 {
     bottom: -50px;
     left: 18%;
 }
 
-/* Seat 2 — left side lower */
+/* Seat 2 -- left side lower */
 #seat-2 {
     left: -75px;
     bottom: 25%;
 }
 
-/* Seat 3 — left side upper */
+/* Seat 3 -- left side upper */
 #seat-3 {
     left: -75px;
     top: 18%;
 }
 
-/* Seat 4 — top left area */
+/* Seat 4 -- top left area */
 #seat-4 {
     top: -65px;
     left: 18%;
 }
 
-/* Seat 5 — top center */
+/* Seat 5 -- top center */
 #seat-5 {
     top: -65px;
     left: 50%;
     transform: translateX(-50%);
 }
 
-/* Seat 6 — top right area */
+/* Seat 6 -- top right area */
 #seat-6 {
     top: -65px;
     right: 18%;
 }
 
-/* Seat 7 — right side upper */
+/* Seat 7 -- right side upper */
 #seat-7 {
     right: -75px;
     top: 18%;
 }
 
-/* Seat 8 — right side lower */
+/* Seat 8 -- right side lower */
 #seat-8 {
     right: -75px;
     bottom: 25%;
 }
 
-/* Seat 9 — bottom right area */
+/* Seat 9 -- bottom right area */
 #seat-9 {
     bottom: -50px;
     right: 18%;
 }
 
-/* Seats 10 and 11 — extra seats when table is fuller */
+/* Seats 10 and 11 -- extra seats when table is fuller */
 #seat-10 {
     bottom: -50px;
     right: 5%;
@@ -261,6 +281,13 @@ body {
 
 .seat-action {
     color: #66ccff;
+    font-size: 10px;
+    font-style: italic;
+    min-height: 13px;
+}
+
+.seat-discards {
+    color: #66ffaa;
     font-size: 10px;
     font-style: italic;
     min-height: 13px;
@@ -365,6 +392,22 @@ body {
 }
 
 /* ============================================================
+   Game Type Label
+   ============================================================ */
+#game-type-label {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #aaaaaa;
+    font-size: 12px;
+    white-space: nowrap;
+    font-style: italic;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* ============================================================
    Hand Info
    ============================================================ */
 #hand-info {
@@ -454,6 +497,98 @@ body {
 #action-raise-input:focus {
     outline: none;
     border-color: #5588ff;
+}
+
+/* ============================================================
+   Draw Panel (5-Card Draw)
+   ============================================================ */
+#draw-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.92);
+    padding: 18px 28px;
+    border-radius: 12px;
+    border: 1px solid #555;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+    z-index: 200;
+}
+
+.draw-cards {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.draw-card {
+    width: 56px;
+    height: 78px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    background: #ffffff;
+    border: 2px solid #aaaaaa;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    color: #111;
+    padding: 4px;
+}
+
+.draw-card:hover {
+    border-color: #5588ff;
+}
+
+.draw-card[data-selected="true"] {
+    border-color: #ff4444;
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+    transform: translateY(-6px);
+    background: #ffe0e0;
+}
+
+#draw-discard-count {
+    color: #cccccc;
+    font-size: 14px;
+}
+
+#draw-submit-btn {
+    padding: 10px 24px;
+    font-size: 15px;
+    font-weight: bold;
+    background: #2d8a4e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+#draw-submit-btn:hover {
+    background: #38a860;
+}
+
+/* ============================================================
+   Draw Status (5-Card Draw)
+   ============================================================ */
+#draw-status {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #f0c040;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+    z-index: 200;
+    white-space: nowrap;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
 /* ============================================================
@@ -579,6 +714,424 @@ body {
 
 #play-again-btn:hover {
     background: #38a860;
+}
+
+/* ============================================================
+   3-Card Poker Screen
+   ============================================================ */
+#screen-threecard {
+    position: relative;
+    width: 100vw;
+    min-height: 100vh;
+    background-color: #0d0d0d;
+    overflow-x: hidden;
+    padding-bottom: 40px;
+}
+
+.tc-header {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 20px;
+    background: rgba(0, 0, 0, 0.6);
+    border-bottom: 1px solid #333;
+}
+
+.tc-game-label {
+    font-size: 20px;
+    font-weight: bold;
+    color: #f0c040;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.tc-hand-number {
+    font-size: 15px;
+    color: #ccc;
+}
+
+.tc-table-limits {
+    font-size: 13px;
+    color: #aaa;
+}
+
+/* Table area */
+.tc-table-area {
+    position: relative;
+    width: 860px;
+    min-height: 460px;
+    margin: 40px auto 0;
+    background: radial-gradient(ellipse at center, #1a5c2e 0%, #0e3b1a 100%);
+    border-radius: 230px;
+    border: 10px solid #5c3a1e;
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Dealer area - center of table */
+.tc-dealer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -60%);
+    text-align: center;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 10px;
+    padding: 10px 18px;
+    border: 1px solid #666;
+    min-width: 160px;
+}
+
+.tc-dealer-label {
+    font-size: 11px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+}
+
+.tc-dealer-cards {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-bottom: 6px;
+}
+
+.tc-dealer-status {
+    font-size: 12px;
+    font-weight: bold;
+    color: #f0c040;
+    min-height: 16px;
+}
+
+/* 3-Card card element */
+.tc-card {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 5px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    min-width: 30px;
+    min-height: 40px;
+    line-height: 1;
+    background: #ffffff;
+    border: 1px solid #aaa;
+    color: #111;
+}
+
+.tc-card:empty {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    color: transparent;
+}
+
+/* Player seats */
+.tc-seat {
+    position: absolute;
+    width: 138px;
+    text-align: center;
+    padding: 8px 6px;
+    background: rgba(0, 0, 0, 0.65);
+    border-radius: 8px;
+    border: 2px solid #555;
+    font-size: 12px;
+}
+
+.tc-seat-human {
+    border-color: #f0c040;
+    background: rgba(0, 0, 0, 0.78);
+}
+
+/* Seat positions around the oval (6 seats total: 0=human bottom, 1–5 AI) */
+[data-testid="tc-seat-0"] {
+    bottom: -75px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+[data-testid="tc-seat-1"] {
+    bottom: -55px;
+    left: 16%;
+}
+
+[data-testid="tc-seat-2"] {
+    left: -78px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+[data-testid="tc-seat-3"] {
+    top: -70px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+[data-testid="tc-seat-4"] {
+    right: -78px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+[data-testid="tc-seat-5"] {
+    bottom: -55px;
+    right: 16%;
+}
+
+.tc-seat-name {
+    display: block;
+    font-weight: bold;
+    color: #e0e0e0;
+    font-size: 13px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tc-seat-bankroll {
+    display: block;
+    color: #aaa;
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+.tc-seat-cards {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 4px 0;
+}
+
+.tc-bet-label {
+    display: block;
+    font-size: 10px;
+    color: #f0c040;
+    min-height: 14px;
+    line-height: 14px;
+}
+
+.tc-result {
+    display: block;
+    font-size: 13px;
+    font-weight: bold;
+    min-height: 16px;
+    line-height: 16px;
+    color: #66ff88;
+}
+
+.tc-seat-status {
+    display: block;
+    font-size: 10px;
+    font-weight: bold;
+    color: #ff8844;
+    min-height: 13px;
+    letter-spacing: 0.5px;
+}
+
+/* Panels */
+.tc-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.92);
+    border: 1px solid #555;
+    border-radius: 12px;
+    padding: 16px 24px;
+    z-index: 200;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+    min-width: 280px;
+    text-align: center;
+}
+
+.tc-bet-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.tc-bet-input-label {
+    font-size: 13px;
+    color: #ccc;
+    width: 160px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.tc-bet-input {
+    width: 100px;
+    padding: 6px 8px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #2a2a3e;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.tc-bet-input:focus {
+    outline: none;
+    border-color: #5588ff;
+}
+
+.tc-panel-btns {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.tc-human-bankroll {
+    margin-top: 10px;
+    color: #aaa;
+    font-size: 13px;
+}
+
+.tc-results-panel {
+    text-align: left;
+}
+
+.tc-results-summary {
+    font-size: 14px;
+    color: #ccc;
+    margin-bottom: 8px;
+}
+
+.tc-results-net {
+    font-size: 22px;
+    font-weight: bold;
+    color: #f0c040;
+    margin-bottom: 8px;
+}
+
+.tc-hand-name {
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 4px;
+}
+
+/* Buttons */
+.tc-btn {
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: white;
+    transition: opacity 0.1s;
+}
+
+.tc-btn:hover {
+    opacity: 0.85;
+}
+
+.tc-btn-primary {
+    background: #2d8a4e;
+}
+
+.tc-btn-primary:hover {
+    background: #38a860;
+}
+
+.tc-btn-secondary {
+    background: #555;
+}
+
+.tc-btn-secondary:hover {
+    background: #666;
+}
+
+.tc-btn-danger {
+    background: #cc3333;
+}
+
+.tc-btn-danger:hover {
+    background: #dd4444;
+}
+
+.tc-btn-cashout {
+    background: #cc8833;
+}
+
+.tc-btn-cashout:hover {
+    background: #dd9944;
+}
+
+/* Action buttons positioned outside panel */
+.tc-action-btn {
+    position: fixed;
+    z-index: 210;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+[data-testid="tc-next-hand-btn"].tc-action-btn {
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 32px;
+    font-size: 16px;
+}
+
+[data-testid="tc-cashout-btn"].tc-action-btn {
+    bottom: 160px;
+    right: 30px;
+    transform: none;
+    left: auto;
+    padding: 10px 18px;
+    font-size: 13px;
+}
+
+/* Pay table */
+.tc-paytable {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 600px auto 30px;
+    max-width: 860px;
+    padding: 0 20px;
+}
+
+.tc-paytable-table {
+    border-collapse: collapse;
+    font-size: 12px;
+    color: #ccc;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 6px;
+    overflow: hidden;
+    min-width: 180px;
+}
+
+.tc-paytable-table caption {
+    font-weight: bold;
+    color: #f0c040;
+    font-size: 13px;
+    padding: 8px 10px 4px;
+    text-align: left;
+    caption-side: top;
+}
+
+.tc-paytable-table td {
+    padding: 5px 10px;
+    border-bottom: 1px solid #2e2e3e;
+}
+
+.tc-paytable-table tr:last-child td {
+    border-bottom: none;
+}
+
+.tc-paytable-table td:last-child {
+    text-align: right;
+    font-weight: bold;
+    color: #88cc88;
 }
 
 /* ============================================================

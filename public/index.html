@@ -3,41 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Texas Hold'em Poker</title>
+    <title>Poker</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
     <!-- Config Screen -->
     <div id="screen-config" data-testid="screen-config">
-        <h1>Texas Hold'em Poker</h1>
+        <h1>Poker</h1>
 
         <div class="config-field">
-            <label for="config-ai-count">Number of AI Players</label>
-            <input type="number" id="config-ai-count" data-testid="config-ai-count" min="1" max="11" value="5">
-            <div class="config-error" data-testid="config-error-ai-count"></div>
+            <label for="config-tournament-type">Tournament Type</label>
+            <select id="config-tournament-type" data-testid="config-tournament-type">
+                <option value="holdem">Texas Hold'em No-Limit</option>
+                <option value="fivecard">5-Card Draw No-Limit</option>
+                <option value="threecard">3-Card Poker</option>
+            </select>
+            <div class="config-error" data-testid="config-error-tournament-type"></div>
         </div>
 
-        <div class="config-field">
-            <label for="config-starting-stack">Starting Stack (chips)</label>
-            <input type="number" id="config-starting-stack" data-testid="config-starting-stack" min="100" max="1000000" value="1000">
-            <div class="config-error" data-testid="config-error-starting-stack"></div>
-        </div>
+        <!-- Tournament fields (Hold'em and 5-Card Draw) -->
+        <div id="tournament-config-fields">
+            <div class="config-field">
+                <label for="config-ai-count">Number of AI Players</label>
+                <input type="number" id="config-ai-count" data-testid="config-ai-count" min="1" max="11" value="5">
+                <div class="config-error" data-testid="config-error-ai-count"></div>
+            </div>
 
-        <div class="config-field">
-            <label for="config-hands-per-level">Hands Per Blind Level</label>
-            <input type="number" id="config-hands-per-level" data-testid="config-hands-per-level" min="1" max="100" value="5">
-            <div class="config-error" data-testid="config-error-hands-per-level"></div>
-        </div>
+            <div class="config-field">
+                <label for="config-starting-stack">Starting Stack (chips)</label>
+                <input type="number" id="config-starting-stack" data-testid="config-starting-stack" min="100" max="1000000" value="1000">
+                <div class="config-error" data-testid="config-error-starting-stack"></div>
+            </div>
 
-        <div class="config-field">
-            <label for="config-blind-schedule">Blind Schedule</label>
-            <textarea id="config-blind-schedule" data-testid="config-blind-schedule" rows="6">10/20
+            <div class="config-field">
+                <label for="config-hands-per-level">Hands Per Blind Level</label>
+                <input type="number" id="config-hands-per-level" data-testid="config-hands-per-level" min="1" max="100" value="5">
+                <div class="config-error" data-testid="config-error-hands-per-level"></div>
+            </div>
+
+            <div class="config-field">
+                <label for="config-blind-schedule">Blind Schedule</label>
+                <textarea id="config-blind-schedule" data-testid="config-blind-schedule" rows="6">10/20
 25/50
 50/100
 100/200
 200/400</textarea>
-            <div class="config-error" data-testid="config-error-blind-schedule"></div>
+                <div class="config-error" data-testid="config-error-blind-schedule"></div>
+            </div>
+        </div>
+
+        <!-- 3-Card Poker fields -->
+        <div id="threecard-config-fields" style="display:none">
+            <div class="config-field">
+                <label for="config-bankroll">Starting Bankroll</label>
+                <input type="number" data-testid="config-bankroll" id="config-bankroll" value="1000" min="100" max="1000000">
+                <div class="config-error" data-testid="config-error-bankroll"></div>
+            </div>
+            <div class="config-field">
+                <label for="config-min-bet">Minimum Bet</label>
+                <input type="number" data-testid="config-min-bet" id="config-min-bet" value="5" min="1" max="10000">
+                <div class="config-error" data-testid="config-error-min-bet"></div>
+            </div>
+            <div class="config-field">
+                <label for="config-max-bet">Maximum Bet</label>
+                <input type="number" data-testid="config-max-bet" id="config-max-bet" value="500" min="1" max="500000">
+                <div class="config-error" data-testid="config-error-max-bet"></div>
+            </div>
         </div>
 
         <button id="config-start-btn" data-testid="config-start-btn" disabled>Start Game</button>
@@ -65,6 +97,9 @@
             <!-- Blind display -->
             <div data-testid="blind-display" id="blind-display"></div>
 
+            <!-- Game type label -->
+            <div data-testid="game-type-label" id="game-type-label"></div>
+
             <!-- Seat 0 (human player) - always at bottom center -->
             <div data-testid="seat-0" id="seat-0" class="player-seat seat-human">
                 <div data-testid="seat-0-name" class="seat-name"></div>
@@ -73,6 +108,7 @@
                 <div data-testid="seat-0-bet" class="seat-bet"></div>
                 <div data-testid="seat-0-status" class="seat-status"></div>
                 <div data-testid="seat-0-action" class="seat-action"></div>
+                <div data-testid="seat-0-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 1 -->
@@ -83,6 +119,7 @@
                 <div data-testid="seat-1-bet" class="seat-bet"></div>
                 <div data-testid="seat-1-status" class="seat-status"></div>
                 <div data-testid="seat-1-action" class="seat-action"></div>
+                <div data-testid="seat-1-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 2 -->
@@ -93,6 +130,7 @@
                 <div data-testid="seat-2-bet" class="seat-bet"></div>
                 <div data-testid="seat-2-status" class="seat-status"></div>
                 <div data-testid="seat-2-action" class="seat-action"></div>
+                <div data-testid="seat-2-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 3 -->
@@ -103,6 +141,7 @@
                 <div data-testid="seat-3-bet" class="seat-bet"></div>
                 <div data-testid="seat-3-status" class="seat-status"></div>
                 <div data-testid="seat-3-action" class="seat-action"></div>
+                <div data-testid="seat-3-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 4 -->
@@ -113,6 +152,7 @@
                 <div data-testid="seat-4-bet" class="seat-bet"></div>
                 <div data-testid="seat-4-status" class="seat-status"></div>
                 <div data-testid="seat-4-action" class="seat-action"></div>
+                <div data-testid="seat-4-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 5 -->
@@ -123,6 +163,7 @@
                 <div data-testid="seat-5-bet" class="seat-bet"></div>
                 <div data-testid="seat-5-status" class="seat-status"></div>
                 <div data-testid="seat-5-action" class="seat-action"></div>
+                <div data-testid="seat-5-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 6 -->
@@ -133,6 +174,7 @@
                 <div data-testid="seat-6-bet" class="seat-bet"></div>
                 <div data-testid="seat-6-status" class="seat-status"></div>
                 <div data-testid="seat-6-action" class="seat-action"></div>
+                <div data-testid="seat-6-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 7 -->
@@ -143,6 +185,7 @@
                 <div data-testid="seat-7-bet" class="seat-bet"></div>
                 <div data-testid="seat-7-status" class="seat-status"></div>
                 <div data-testid="seat-7-action" class="seat-action"></div>
+                <div data-testid="seat-7-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 8 -->
@@ -153,6 +196,7 @@
                 <div data-testid="seat-8-bet" class="seat-bet"></div>
                 <div data-testid="seat-8-status" class="seat-status"></div>
                 <div data-testid="seat-8-action" class="seat-action"></div>
+                <div data-testid="seat-8-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 9 -->
@@ -163,6 +207,7 @@
                 <div data-testid="seat-9-bet" class="seat-bet"></div>
                 <div data-testid="seat-9-status" class="seat-status"></div>
                 <div data-testid="seat-9-action" class="seat-action"></div>
+                <div data-testid="seat-9-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 10 -->
@@ -173,6 +218,7 @@
                 <div data-testid="seat-10-bet" class="seat-bet"></div>
                 <div data-testid="seat-10-status" class="seat-status"></div>
                 <div data-testid="seat-10-action" class="seat-action"></div>
+                <div data-testid="seat-10-discards" class="seat-discards"></div>
             </div>
 
             <!-- Seat 11 -->
@@ -183,6 +229,7 @@
                 <div data-testid="seat-11-bet" class="seat-bet"></div>
                 <div data-testid="seat-11-status" class="seat-status"></div>
                 <div data-testid="seat-11-action" class="seat-action"></div>
+                <div data-testid="seat-11-discards" class="seat-discards"></div>
             </div>
 
         </div><!-- end .table-area -->
@@ -206,12 +253,223 @@
             <button data-testid="action-allin" id="action-allin">All In</button>
         </div>
 
+        <!-- Draw panel (5-Card Draw only) -->
+        <div data-testid="draw-panel" id="draw-panel" style="display: none;">
+            <div class="draw-cards">
+                <button data-testid="draw-card-0" class="draw-card" data-selected="false"></button>
+                <button data-testid="draw-card-1" class="draw-card" data-selected="false"></button>
+                <button data-testid="draw-card-2" class="draw-card" data-selected="false"></button>
+                <button data-testid="draw-card-3" class="draw-card" data-selected="false"></button>
+                <button data-testid="draw-card-4" class="draw-card" data-selected="false"></button>
+            </div>
+            <div data-testid="draw-discard-count" id="draw-discard-count"></div>
+            <button data-testid="draw-submit-btn" id="draw-submit-btn">Stand Pat</button>
+        </div>
+
+        <!-- Draw status (5-Card Draw only) -->
+        <div data-testid="draw-status" id="draw-status" style="display: none;"></div>
+
     </div><!-- end #screen-game -->
+
+    <!-- 3-Card Poker Game Screen -->
+    <div id="screen-threecard" data-testid="screen-threecard" style="display:none">
+
+        <!-- Table header -->
+        <div class="tc-header">
+            <span data-testid="tc-game-label" class="tc-game-label"></span>
+            <span data-testid="tc-hand-number" class="tc-hand-number"></span>
+            <span data-testid="tc-table-limits" class="tc-table-limits"></span>
+        </div>
+
+        <div class="tc-table-area">
+
+            <!-- Dealer area -->
+            <div data-testid="tc-dealer" class="tc-dealer">
+                <div class="tc-dealer-label">Dealer</div>
+                <div data-testid="tc-dealer-cards" class="tc-dealer-cards">
+                    <span data-testid="tc-dealer-card-0" class="tc-card"></span>
+                    <span data-testid="tc-dealer-card-1" class="tc-card"></span>
+                    <span data-testid="tc-dealer-card-2" class="tc-card"></span>
+                </div>
+                <div data-testid="tc-dealer-status" class="tc-dealer-status"></div>
+            </div>
+
+            <!-- Player seats: seat-0 = human, seat-1 through seat-5 = AI -->
+            <div data-testid="tc-seat-0" class="tc-seat tc-seat-human">
+                <span data-testid="tc-seat-0-name" class="tc-seat-name"></span>
+                <span data-testid="tc-seat-0-bankroll" class="tc-seat-bankroll"></span>
+                <div data-testid="tc-seat-0-cards" class="tc-seat-cards">
+                    <span data-testid="tc-seat-0-card-0" class="tc-card"></span>
+                    <span data-testid="tc-seat-0-card-1" class="tc-card"></span>
+                    <span data-testid="tc-seat-0-card-2" class="tc-card"></span>
+                </div>
+                <span data-testid="tc-seat-0-ante" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-0-play" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-0-pairplus" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-0-sixcard" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-0-result" class="tc-result"></span>
+                <span data-testid="tc-seat-0-status" class="tc-seat-status"></span>
+            </div>
+
+            <div data-testid="tc-seat-1" class="tc-seat">
+                <span data-testid="tc-seat-1-name" class="tc-seat-name"></span>
+                <span data-testid="tc-seat-1-bankroll" class="tc-seat-bankroll"></span>
+                <div data-testid="tc-seat-1-cards" class="tc-seat-cards">
+                    <span data-testid="tc-seat-1-card-0" class="tc-card"></span>
+                    <span data-testid="tc-seat-1-card-1" class="tc-card"></span>
+                    <span data-testid="tc-seat-1-card-2" class="tc-card"></span>
+                </div>
+                <span data-testid="tc-seat-1-ante" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-1-play" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-1-pairplus" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-1-sixcard" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-1-result" class="tc-result"></span>
+                <span data-testid="tc-seat-1-status" class="tc-seat-status"></span>
+            </div>
+
+            <div data-testid="tc-seat-2" class="tc-seat">
+                <span data-testid="tc-seat-2-name" class="tc-seat-name"></span>
+                <span data-testid="tc-seat-2-bankroll" class="tc-seat-bankroll"></span>
+                <div data-testid="tc-seat-2-cards" class="tc-seat-cards">
+                    <span data-testid="tc-seat-2-card-0" class="tc-card"></span>
+                    <span data-testid="tc-seat-2-card-1" class="tc-card"></span>
+                    <span data-testid="tc-seat-2-card-2" class="tc-card"></span>
+                </div>
+                <span data-testid="tc-seat-2-ante" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-2-play" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-2-pairplus" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-2-sixcard" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-2-result" class="tc-result"></span>
+                <span data-testid="tc-seat-2-status" class="tc-seat-status"></span>
+            </div>
+
+            <div data-testid="tc-seat-3" class="tc-seat">
+                <span data-testid="tc-seat-3-name" class="tc-seat-name"></span>
+                <span data-testid="tc-seat-3-bankroll" class="tc-seat-bankroll"></span>
+                <div data-testid="tc-seat-3-cards" class="tc-seat-cards">
+                    <span data-testid="tc-seat-3-card-0" class="tc-card"></span>
+                    <span data-testid="tc-seat-3-card-1" class="tc-card"></span>
+                    <span data-testid="tc-seat-3-card-2" class="tc-card"></span>
+                </div>
+                <span data-testid="tc-seat-3-ante" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-3-play" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-3-pairplus" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-3-sixcard" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-3-result" class="tc-result"></span>
+                <span data-testid="tc-seat-3-status" class="tc-seat-status"></span>
+            </div>
+
+            <div data-testid="tc-seat-4" class="tc-seat">
+                <span data-testid="tc-seat-4-name" class="tc-seat-name"></span>
+                <span data-testid="tc-seat-4-bankroll" class="tc-seat-bankroll"></span>
+                <div data-testid="tc-seat-4-cards" class="tc-seat-cards">
+                    <span data-testid="tc-seat-4-card-0" class="tc-card"></span>
+                    <span data-testid="tc-seat-4-card-1" class="tc-card"></span>
+                    <span data-testid="tc-seat-4-card-2" class="tc-card"></span>
+                </div>
+                <span data-testid="tc-seat-4-ante" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-4-play" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-4-pairplus" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-4-sixcard" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-4-result" class="tc-result"></span>
+                <span data-testid="tc-seat-4-status" class="tc-seat-status"></span>
+            </div>
+
+            <div data-testid="tc-seat-5" class="tc-seat">
+                <span data-testid="tc-seat-5-name" class="tc-seat-name"></span>
+                <span data-testid="tc-seat-5-bankroll" class="tc-seat-bankroll"></span>
+                <div data-testid="tc-seat-5-cards" class="tc-seat-cards">
+                    <span data-testid="tc-seat-5-card-0" class="tc-card"></span>
+                    <span data-testid="tc-seat-5-card-1" class="tc-card"></span>
+                    <span data-testid="tc-seat-5-card-2" class="tc-card"></span>
+                </div>
+                <span data-testid="tc-seat-5-ante" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-5-play" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-5-pairplus" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-5-sixcard" class="tc-bet-label"></span>
+                <span data-testid="tc-seat-5-result" class="tc-result"></span>
+                <span data-testid="tc-seat-5-status" class="tc-seat-status"></span>
+            </div>
+
+        </div><!-- end .tc-table-area -->
+
+        <!-- Human betting panel: visible only during "betting" phase -->
+        <div data-testid="tc-bet-panel" class="tc-panel" style="display:none">
+            <div class="tc-bet-row">
+                <label class="tc-bet-input-label">Ante</label>
+                <input type="number" data-testid="tc-ante-input" class="tc-bet-input">
+            </div>
+            <div class="tc-bet-row">
+                <label class="tc-bet-input-label">Pair Plus (optional)</label>
+                <input type="number" data-testid="tc-pairplus-input" class="tc-bet-input" value="0">
+            </div>
+            <div class="tc-bet-row">
+                <label class="tc-bet-input-label">Six Card Bonus (optional)</label>
+                <input type="number" data-testid="tc-sixcard-input" class="tc-bet-input" value="0">
+            </div>
+            <div class="tc-panel-btns">
+                <button data-testid="tc-place-bets-btn" class="tc-btn tc-btn-primary">Place Bets</button>
+                <button data-testid="tc-clear-bets-btn" class="tc-btn tc-btn-secondary">Clear Bets</button>
+            </div>
+            <div data-testid="tc-human-bankroll" class="tc-human-bankroll"></div>
+        </div>
+
+        <!-- Human play panel: visible only during "dealing" phase -->
+        <div data-testid="tc-play-panel" class="tc-panel" style="display:none">
+            <button data-testid="tc-play-btn" class="tc-btn tc-btn-primary"></button>
+            <button data-testid="tc-fold-btn" class="tc-btn tc-btn-danger"></button>
+        </div>
+
+        <!-- Results panel: visible during "resolution" and "hand-complete" phases -->
+        <div data-testid="tc-results-panel" class="tc-panel tc-results-panel" style="display:none">
+            <div data-testid="tc-results-summary" class="tc-results-summary"></div>
+            <div data-testid="tc-results-net" class="tc-results-net"></div>
+            <div data-testid="tc-dealer-hand-name" class="tc-hand-name"></div>
+            <div data-testid="tc-human-hand-name" class="tc-hand-name"></div>
+        </div>
+
+        <!-- Next Hand button: visible during "hand-complete" only -->
+        <button data-testid="tc-next-hand-btn" class="tc-btn tc-btn-primary tc-action-btn" style="display:none">Next Hand</button>
+
+        <!-- Cash Out button: visible during "betting" and "hand-complete" -->
+        <button data-testid="tc-cashout-btn" class="tc-btn tc-btn-cashout tc-action-btn" style="display:none"></button>
+
+        <!-- Pay table: always visible, static HTML, never updated by JS -->
+        <div data-testid="tc-paytable" class="tc-paytable">
+            <table class="tc-paytable-table">
+                <caption>Ante Bonus</caption>
+                <tr><td>Straight Flush</td><td>5:1</td></tr>
+                <tr><td>Three of a Kind</td><td>4:1</td></tr>
+                <tr><td>Straight</td><td>1:1</td></tr>
+            </table>
+            <table class="tc-paytable-table">
+                <caption>Pair Plus</caption>
+                <tr><td>Straight Flush</td><td>40:1</td></tr>
+                <tr><td>Three of a Kind</td><td>30:1</td></tr>
+                <tr><td>Straight</td><td>6:1</td></tr>
+                <tr><td>Flush</td><td>4:1</td></tr>
+                <tr><td>Pair</td><td>1:1</td></tr>
+            </table>
+            <table class="tc-paytable-table">
+                <caption>Six Card Bonus</caption>
+                <tr><td>Royal Flush</td><td>1000:1</td></tr>
+                <tr><td>Straight Flush</td><td>200:1</td></tr>
+                <tr><td>Four of a Kind</td><td>50:1</td></tr>
+                <tr><td>Full House</td><td>25:1</td></tr>
+                <tr><td>Flush</td><td>15:1</td></tr>
+                <tr><td>Straight</td><td>10:1</td></tr>
+                <tr><td>Three of a Kind</td><td>5:1</td></tr>
+            </table>
+        </div>
+
+    </div><!-- end #screen-threecard -->
 
     <!-- Game Over Screen -->
     <div id="screen-gameover" data-testid="screen-gameover" style="display: none;">
         <div data-testid="gameover-message" id="gameover-message"></div>
         <div data-testid="gameover-standings" id="gameover-standings"></div>
+        <div data-testid="gameover-final-bankroll" id="gameover-final-bankroll" style="display:none"></div>
+        <div data-testid="gameover-hands-played" id="gameover-hands-played" style="display:none"></div>
         <button data-testid="play-again-btn" id="play-again-btn">Play Again</button>
     </div>
 

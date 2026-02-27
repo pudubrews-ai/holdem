@@ -113,6 +113,77 @@ function postFlopStrength(holeCards, communityCards) {
   return strengthMap[hand.rank] || 0.15;
 }
 
+function drawHandStrength(holeCards) {
+  const hand = Hand.solve(holeCards);
+  const strengthMap = {
+    1: 0.15, 2: 0.35, 3: 0.55, 4: 0.65,
+    5: 0.72, 6: 0.78, 7: 0.88, 8: 0.96, 9: 1.0
+  };
+  return strengthMap[hand.rank] || 0.15;
+}
+
+function aiDrawDecision(holeCards, skillTier) {
+  const hand = Hand.solve(holeCards);
+
+  // Made hands: keep all 5, discard 0
+  if (hand.rank >= 3) { // two pair or better
+    return []; // discard nothing
+  }
+
+  if (hand.rank === 2) { // one pair
+    // Simplified: identify the 2 cards with the most common rank, discard the rest
+    const ranks = holeCards.map(c => c[0]);
+    const rankCounts = {};
+    ranks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
+    const pairRankChar = Object.keys(rankCounts).find(r => rankCounts[r] === 2);
+    const toKeep = [];
+    const toDiscard = [];
+    let keptPair = 0;
+    for (const card of holeCards) {
+      if (card[0] === pairRankChar && keptPair < 2) {
+        toKeep.push(card);
+        keptPair++;
+      } else {
+        toDiscard.push(card);
+      }
+    }
+    return toDiscard; // discard up to 3 non-pair cards
+  }
+
+  // No made hand (high card): discard based on tier
+  if (skillTier === 'tight-aggressive') {
+    // Keep the 2 highest-ranked cards, discard 3
+    const rankOrder = 'AKQJT98765432';
+    const sorted = [...holeCards].sort((a, b) => rankOrder.indexOf(a[0]) - rankOrder.indexOf(b[0]));
+    return sorted.slice(2); // discard the 3 lowest
+  }
+
+  if (skillTier === 'loose-passive') {
+    // Keep top 1 + 1 random (effectively discard 3 of the lower cards)
+    const rankOrder = 'AKQJT98765432';
+    const sorted = [...holeCards].sort((a, b) => rankOrder.indexOf(a[0]) - rankOrder.indexOf(b[0]));
+    return sorted.slice(1, 4); // discard 3 of the lower cards (keep top 1 + 1 random)
+  }
+
+  if (skillTier === 'loose-aggressive') {
+    // Keep suited cards if 3+ are same suit (flush draw), otherwise keep 2 highest
+    const suitCounts = {};
+    holeCards.forEach(c => suitCounts[c[1]] = (suitCounts[c[1]] || 0) + 1);
+    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] >= 3);
+    if (flushSuit) {
+      const offsuit = holeCards.filter(c => c[1] !== flushSuit);
+      const toDiscard = offsuit.slice(0, 3);
+      return toDiscard;
+    }
+    // No flush draw: keep 2 highest, discard 3
+    const rankOrder = 'AKQJT98765432';
+    const sorted = [...holeCards].sort((a, b) => rankOrder.indexOf(a[0]) - rankOrder.indexOf(b[0]));
+    return sorted.slice(2);
+  }
+
+  return []; // fallback: stand pat
+}
+
 // ─── Player helpers ───────────────────────────────────────────────────────────
 
 function getNonEliminatedPlayers(gs) {
@@ -209,7 +280,11 @@ function dealHoleCards(gs) {
   ];
 
   for (const player of orderedPlayers) {
-    player.holeCards = [gs.deck.pop(), gs.deck.pop()];
+    const cardCount = gs.tournamentType === 'fivecard' ? 5 : 2;
+    player.holeCards = [];
+    for (let c = 0; c < cardCount; c++) {
+      player.holeCards.push(gs.deck.pop());
+    }
     player.status = 'active';
     player.bet = 0;
     player.totalBetThisHand = 0;
@@ -284,7 +359,7 @@ function resetAllBets(gs) {
 
 function resetActedFlags(gs) {
   for (const player of gs.players) {
-    if (player.status === 'active') {
+    if (player.status !== 'eliminated') {
       player.hasActedThisRound = false;
     }
   }
@@ -477,7 +552,9 @@ function runShowdown(gs) {
         // Evaluate with pokersolver
         const hands = eligibleNonFolded.map(p => ({
           player: p,
-          hand: Hand.solve([...p.holeCards, ...gs.communityCards])
+          hand: gs.tournamentType === 'fivecard'
+            ? Hand.solve(p.holeCards)
+            : Hand.solve([...p.holeCards, ...gs.communityCards])
         }));
         const winnerHands = Hand.winners(hands.map(h => h.hand));
         const winners = hands.filter(h => winnerHands.includes(h.hand)).map(h => h.player);
@@ -548,7 +625,24 @@ function advanceStreet(gs) {
   gs.minRaise = gs.bigBlind;
   gs.lastAggressorSeat = null;
 
-  // Deal community cards and advance phase
+  if (gs.tournamentType === 'fivecard') {
+    // 5-Card Draw street progression
+    switch (gs.phase) {
+      case 'pre-flop':
+        // Pre-draw betting complete -> enter draw phase
+        gs.phase = 'draw';
+        processDraw(gs);
+        return; // processDraw handles everything (phase transition to post-draw or waits for human)
+      case 'post-draw':
+        // Post-draw betting complete -> showdown
+        runShowdown(gs);
+        return;
+      default:
+        return; // safety
+    }
+  }
+
+  // Hold'em street progression (unchanged from V1)
   switch (gs.phase) {
     case 'pre-flop':
       gs.communityCards = [gs.deck.pop(), gs.deck.pop(), gs.deck.pop()];
@@ -567,7 +661,7 @@ function advanceStreet(gs) {
       return; // showdown handles the rest
   }
 
-  // Set action seat to first active player left of dealer
+  // Set action seat to first active player left of dealer (Hold'em only -- fivecard returned above)
   setPostFlopActionSeat(gs);
 
   // Reset hasActedThisRound for all active players
@@ -588,7 +682,10 @@ function computeAIAction(gs, player) {
 
   // Compute hand strength
   let strength;
-  if (gs.phase === 'pre-flop') {
+  if (gs.tournamentType === 'fivecard') {
+    // 5-Card Draw: use drawHandStrength for both pre-draw and post-draw betting
+    strength = drawHandStrength(player.holeCards);
+  } else if (gs.phase === 'pre-flop') {
     strength = preFlopStrength(player.holeCards);
   } else {
     strength = postFlopStrength(player.holeCards, gs.communityCards);
@@ -664,57 +761,142 @@ function computeAIAction(gs, player) {
   }
 }
 
+// ─── Draw phase processing ────────────────────────────────────────────────────
+
+function processDraw(gs) {
+  // If drawOrder is not initialized, build it now
+  if (!gs.drawOrder || gs.drawOrder.length === 0) {
+    // Build draw-eligible player list: active (non-folded, non-all-in, non-eliminated)
+    // Order: starting left of dealer, clockwise
+    const dealerSeat = gs.players.find(p => p.isDealer).seatIndex;
+    const eligible = gs.players
+      .filter(p => p.status === 'active')
+      .sort((a, b) => a.seatIndex - b.seatIndex);
+
+    // Reorder: players after dealer first, then players at/before dealer
+    const afterDealer = eligible.filter(p => p.seatIndex > dealerSeat);
+    const beforeOrAtDealer = eligible.filter(p => p.seatIndex <= dealerSeat);
+    const ordered = [...afterDealer, ...beforeOrAtDealer];
+
+    gs.drawOrder = ordered.map(p => p.seatIndex);
+    gs.drawIndex = 0;
+  }
+
+  // Process from current drawIndex
+  while (gs.drawIndex < gs.drawOrder.length) {
+    const seatIdx = gs.drawOrder[gs.drawIndex];
+    const currentPlayer = gs.players.find(p => p.seatIndex === seatIdx);
+
+    if (!currentPlayer || currentPlayer.status === 'eliminated' ||
+        currentPlayer.status === 'folded' || currentPlayer.status === 'all-in') {
+      // Skip this player (status may have changed since drawOrder was built)
+      gs.drawIndex++;
+      continue;
+    }
+
+    // This player needs to draw
+    if (currentPlayer.id === 'human') {
+      if (gs.humanStatus === 'spectating') {
+        // Auto-skip eliminated human: stand pat
+        currentPlayer.discardCount = 0;
+        gs.drawIndex++;
+        continue;
+      } else {
+        // Human must submit POST /api/draw -- stop here and wait
+        gs.drawSeat = currentPlayer.seatIndex;
+        return; // wait for human input
+      }
+    }
+
+    // AI player: compute and execute draw
+    let discards = aiDrawDecision(currentPlayer.holeCards, currentPlayer.skillTier);
+
+    // Hard cap: maximum 3 discards
+    if (discards.length > 3) {
+      discards = discards.slice(0, 3);
+    }
+
+    // Remove discarded cards, deal replacements
+    currentPlayer.holeCards = currentPlayer.holeCards.filter(c => !discards.includes(c));
+    for (let i = 0; i < discards.length; i++) {
+      currentPlayer.holeCards.push(gs.deck.pop());
+    }
+    currentPlayer.discardCount = discards.length;
+
+    // Defensive assertion: holeCards must be exactly 5 after draw
+    if (currentPlayer.holeCards.length !== 5) {
+      throw new Error('Draw error: player ' + currentPlayer.id + ' has ' + currentPlayer.holeCards.length + ' cards after draw');
+    }
+
+    gs.drawIndex++;
+  }
+
+  // All players have drawn -- advance to post-draw
+  gs.drawSeat = null;
+  gs.drawOrder = [];
+  gs.drawIndex = 0;
+  gs.phase = 'post-draw';
+  gs.currentBet = 0;
+  gs.minRaise = gs.bigBlind;
+  gs.lastAggressorSeat = null;
+  setPostFlopActionSeat(gs);
+  resetActedFlags(gs);
+}
+
 // ─── Main AI processing loop ──────────────────────────────────────────────────
 
 function processAIActions(gs) {
   while (true) {
-    // Check if we should stop
+    // Check 1: If hand-complete or game-over, stop
     if (gs.phase === 'hand-complete' || gs.phase === 'game-over') {
-      // Schedule auto-advance for spectating games
       scheduleAutoAdvance();
       break;
     }
 
-    // Check if betting round is complete
-    if (isBettingRoundComplete(gs)) {
-      advanceStreet(gs);
-      continue; // re-check: new street may need AI actions or may skip betting
-    }
-
-    // Check if only one non-folded player remains
+    // Check 2 (MOVED UP from check 3): Only one non-folded player remains
     const nonFolded = gs.players.filter(p =>
       p.status !== 'folded' && p.status !== 'eliminated'
     );
     if (nonFolded.length === 1) {
-      // Run out remaining community cards, then showdown
-      runOutCommunityCards(gs);
+      if (gs.tournamentType !== 'fivecard') {
+        runOutCommunityCards(gs);
+      }
       runShowdown(gs);
       scheduleAutoAdvance();
       break;
     }
 
-    // Check if all remaining players are all-in (no one can act)
+    // Check 3 (MOVED UP from check 4): All remaining players are all-in
     const activeBettors = gs.players.filter(p => p.status === 'active');
     if (activeBettors.length <= 1 && nonFolded.length > 1) {
-      // At most one player can still bet. Skip remaining betting.
-      // Collect bets, run out cards, showdown
       buildPots(gs.players, gs.pots);
       resetAllBets(gs);
-      runOutCommunityCards(gs);
+      if (gs.tournamentType !== 'fivecard') {
+        runOutCommunityCards(gs);
+      }
       runShowdown(gs);
       scheduleAutoAdvance();
       break;
+    }
+
+    // Check 4 (WAS check 2): Betting round complete -> advance street
+    if (isBettingRoundComplete(gs)) {
+      advanceStreet(gs);
+      if (gs.phase === 'draw' && gs.drawSeat !== null) {
+        const drawPlayer = gs.players.find(p => p.seatIndex === gs.drawSeat);
+        if (drawPlayer && drawPlayer.id === 'human' && gs.humanStatus !== 'spectating') {
+          break;
+        }
+      }
+      continue;
     }
 
     // Find current action player
     const actionPlayer = gs.players.find(p => p.seatIndex === gs.actionSeat);
+    if (!actionPlayer) break;
 
-    if (!actionPlayer) break; // safety
-
-    // If it is the human's turn, stop (return to client)
     if (actionPlayer.id === 'human') break;
 
-    // If it is an AI's turn, compute and execute action
     if (actionPlayer.id.startsWith('ai-')) {
       const aiAction = computeAIAction(gs, actionPlayer);
       processAction(gs, actionPlayer, aiAction.action, aiAction.amount);
@@ -722,7 +904,6 @@ function processAIActions(gs) {
       continue;
     }
 
-    // Safety: should not reach here
     break;
   }
 }
@@ -765,6 +946,22 @@ function setupNewHand(gs) {
   // Reset all players' hasActedThisRound
   resetActedFlags(gs);
   // BB has NOT acted (gets option) — leave hasActedThisRound = false
+
+  // Initialize draw-phase tracking fields
+  gs.drawSeat = null;
+  gs.drawOrder = [];
+  gs.drawIndex = 0;
+
+  // Set discardCount for all active players
+  for (const player of gs.players) {
+    if (player.status !== 'eliminated') {
+      if (gs.tournamentType === 'fivecard') {
+        player.discardCount = 0;
+      } else {
+        player.discardCount = null;
+      }
+    }
+  }
 }
 
 // ─── API Response Serialization ────────────────────────────────────────────────
@@ -830,7 +1027,8 @@ function serializePlayer(player, phase) {
     isDealer: player.isDealer,
     isSmallBlind: player.isSmallBlind,
     isBigBlind: player.isBigBlind,
-    seatIndex: player.seatIndex
+    seatIndex: player.seatIndex,
+    discardCount: player.discardCount !== undefined ? player.discardCount : null
   };
 }
 
@@ -868,6 +1066,9 @@ function serializeGameState(gs) {
     bigBlind: gs.bigBlind,
     actionSeat: gs.actionSeat,
     humanStatus: gs.humanStatus,
+    tournamentType: gs.tournamentType,
+    handsPlayedAtThisLevel: gs.handsPlayedAtThisLevel,
+    drawSeat: gs.drawSeat !== undefined ? gs.drawSeat : null,
     handResult: (gs.phase === 'hand-complete' || gs.phase === 'showdown')
       ? gs.handResult
       : []
@@ -896,11 +1097,459 @@ function scheduleAutoAdvance() {
   }
 }
 
+// ─── 3-Card Poker: Standalone hand evaluator ─────────────────────────────────
+//
+// POKERSOLVER VERIFICATION RESULTS (run before implementation):
+//
+//   Hand.solve(["As","Ks","Qs"]).name  → "High Card"   (FAIL — expected: straight flush)
+//   Hand.solve(["As","Ah","Kd"]).name  → "Pair"        (OK)
+//   Hand.solve(["As","Kh","Qd"]).name  → "High Card"   (FAIL — expected: straight)
+//   Hand.solve(["As","2h","3d"]).name  → "High Card"   (FAIL — expected: straight / ace-low)
+//   Hand.solve(["As","Ks","Qs","Jh","Td","9c"]).name → "Straight"  (OK — 6-card works)
+//   Royal Flush: hand.name = "Straight Flush", hand.descr = "Royal Flush", card.value = string "A"
+//
+// CONCLUSION: pokersolver FAILS 3-card evaluation for straights and flushes.
+// Pairs and three-of-a-kind evaluate correctly for 3-card inputs.
+// 6-card inputs work correctly for the Six Card Bonus bet.
+//
+// IMPLEMENTATION DECISION: The standalone 3-card evaluator (getThreeCardHandName +
+// isThreeCardStraight) is used for ALL 3-card evaluation functions:
+//   - dealerQualifies3C()
+//   - anteBonus3C()
+//   - pairPlusPayout3C()
+//   - hasPairOrBetter3C()
+//   - compareHands3C()
+// The 6-card sixCardPayout3C() continues to use pokersolver (Hand.solve with 6 cards).
+//
+// ROYAL FLUSH DETECTION for sixCardPayout3C():
+//   pokersolver returns hand.name = "Straight Flush" and hand.descr = "Royal Flush"
+//   for a royal flush. Detection uses: hand.descr && hand.descr.toLowerCase() === 'royal flush'
+//   OR name.includes('royal flush'). Never uses card.value === 'A' (though in this
+//   version card.value IS a string "A", the instructions prohibit this approach).
+
+function isThreeCardStraight(cards) {
+  // Handles all 3-card straights: A-K-Q down to A-2-3 (ace-low)
+  // rankOrder index: 0=A, 1=K, 2=Q, 3=J, 4=T, 5=9, 6=8, 7=7, 8=6, 9=5, 10=4, 11=3, 12=2
+  const rankOrder = 'AKQJT98765432';
+  const indices = cards.map(c => rankOrder.indexOf(c[0]));
+  const sorted = [...indices].sort((a, b) => a - b);
+  // Standard consecutive: e.g. [0,1,2] (A-K-Q) or [10,11,12] (4-3-2)
+  if (sorted[2] - sorted[0] === 2 && sorted[1] - sorted[0] === 1) return true;
+  // Ace-low straight: A-2-3 → indices [0, 11, 12]
+  if (sorted[0] === 0 && sorted[1] === 11 && sorted[2] === 12) return true;
+  return false;
+}
+
+function getThreeCardHandName(cards) {
+  // Returns: 'straight flush' | 'three of a kind' | 'straight' | 'flush' | 'pair' | 'high card'
+  const rankOrder = 'AKQJT98765432';
+  const suits = cards.map(c => c[1]);
+  const isFlush = suits.every(s => s === suits[0]);
+  const isStraight = isThreeCardStraight(cards);
+  const ranks = cards.map(c => rankOrder.indexOf(c[0]));
+  const rankCounts = {};
+  ranks.forEach(r => rankCounts[r] = (rankCounts[r] || 0) + 1);
+  const counts = Object.values(rankCounts).sort((a, b) => b - a);
+  const isTrips = counts[0] === 3;
+  const isPair = counts[0] === 2;
+
+  if (isStraight && isFlush) return 'straight flush';
+  if (isTrips) return 'three of a kind';
+  if (isStraight) return 'straight';
+  if (isFlush) return 'flush';
+  if (isPair) return 'pair';
+  return 'high card';
+}
+
+// ─── 3-Card Poker: Queen-6-4 rule (corrected r2 <= 10) ───────────────────────
+
+function shouldPlay3C(holeCards) {
+  // rankOrder index: 0=A, 1=K, 2=Q, 3=J, 4=T, 5=9, 6=8, 7=7, 8=6, 9=5, 10=4, 11=3, 12=2
+  const rankOrder = 'A K Q J T 9 8 7 6 5 4 3 2'.split(' ');
+  const rankIndex = (card) => rankOrder.indexOf(card[0]);
+  const sorted = [...holeCards].sort((a, b) => rankIndex(a) - rankIndex(b));
+  const [r0, r1, r2] = sorted.map(rankIndex);
+  if (r0 > 2) return false; // worse than Queen
+  if (r0 < 2) return true;  // better than Queen (A or K high)
+  // Queen high: check second card
+  if (r1 < 8) return true;  // second card better than 6 (A,K,Q,J,T,9,8,7 — indices 0-7)
+  if (r1 > 8) return false; // second card worse than 6 (5,4,3,2 — indices 9-12)
+  // r1 === 8: second card IS '6' — fall through to third-card check below
+  // Queen-6: check third card
+  // r2 <= 10 means third card is 4 or better (index 10 = '4', index 8 = '6')
+  return r2 <= 10;
+}
+
+// ─── 3-Card Poker: AI helper functions ────────────────────────────────────────
+
+function hasPairOrBetter3C(holeCards) {
+  const name = getThreeCardHandName(holeCards);
+  return ['pair', 'flush', 'straight', 'three of a kind', 'straight flush'].includes(name);
+}
+
+function hasSixCardBonus3C(holeCards) {
+  const suits = holeCards.map(c => c[1]);
+  const suitCounts = {};
+  suits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
+  return Math.max(...Object.values(suitCounts)) >= 2;
+}
+
+// ─── 3-Card Poker: Dealer qualification ──────────────────────────────────────
+
+function dealerQualifies3C(dealerCards) {
+  // Using standalone evaluator — pokersolver fails 3-card straights/flushes
+  const handName = getThreeCardHandName(dealerCards);
+  if (handName === 'pair' || handName === 'flush' || handName === 'straight' ||
+      handName === 'three of a kind' || handName === 'straight flush') {
+    return true;
+  }
+  // High card hand: check if highest card is Queen or better
+  const rankOrder = 'AKQJT98765432';
+  const indices = dealerCards.map(c => rankOrder.indexOf(c[0]));
+  const highIdx = Math.min(...indices); // lower index = higher rank (0=A, 12=2)
+  return highIdx <= 2; // index 0=A, 1=K, 2=Q
+}
+
+// ─── 3-Card Poker: Ante bonus ─────────────────────────────────────────────────
+
+function anteBonus3C(playerCards, anteBet) {
+  const handName = getThreeCardHandName(playerCards);
+  if (handName === 'straight flush') return anteBet * 5;
+  if (handName === 'three of a kind') return anteBet * 4;
+  if (handName === 'straight') return anteBet * 1;
+  return 0;
+}
+
+// ─── 3-Card Poker: Pair Plus payout — returns 0 on loss, never negative ──────
+
+function pairPlusPayout3C(playerCards, pairPlusBet) {
+  if (pairPlusBet === 0) return 0;
+  const handName = getThreeCardHandName(playerCards);
+  if (handName === 'straight flush') return pairPlusBet * 40;
+  if (handName === 'three of a kind') return pairPlusBet * 30;
+  if (handName === 'straight') return pairPlusBet * 6;
+  if (handName === 'flush') return pairPlusBet * 4;
+  if (handName === 'pair') return pairPlusBet * 1;
+  return 0; // loss — return 0, NOT negative. computeNetChange3C handles the deduction.
+}
+
+// ─── 3-Card Poker: Six Card Bonus payout — uses pokersolver (6-card works) ───
+
+function sixCardPayout3C(playerCards, dealerCards, sixCardBet) {
+  if (sixCardBet === 0) return 0;
+  const allSix = [...playerCards, ...dealerCards];
+  const hand = Hand.solve(allSix);
+  if (!hand || typeof hand.name !== 'string') {
+    throw new Error('pokersolver returned unexpected result for six-card hand');
+  }
+  const name = hand.name.toLowerCase();
+
+  // ROYAL FLUSH DETECTION:
+  // pokersolver returns hand.name = "Straight Flush" and hand.descr = "Royal Flush"
+  // for a royal flush hand. We use hand.descr string comparison.
+  // hand.descr = "Royal Flush" for ace-high straight flush.
+  const isRoyalFlush = name.includes('royal flush') ||
+    (hand.descr && hand.descr.toLowerCase() === 'royal flush');
+
+  if (isRoyalFlush) return sixCardBet * 1000;
+  if (name.includes('straight flush')) return sixCardBet * 200;
+  if (name.includes('four of a kind')) return sixCardBet * 50;
+  if (name.includes('full house')) return sixCardBet * 25;
+  if (name.includes('flush')) return sixCardBet * 15;
+  if (name.includes('straight')) return sixCardBet * 10;
+  if (name.includes('three of a kind')) return sixCardBet * 5;
+  return 0; // loss — return 0, NOT negative. computeNetChange3C handles the deduction.
+}
+
+// ─── 3-Card Poker: Hand comparison ────────────────────────────────────────────
+
+function compareHands3C(playerCards, dealerCards) {
+  // Using standalone evaluator — pokersolver fails 3-card straights/flushes
+  const handRank = {
+    'straight flush': 6,
+    'three of a kind': 5,
+    'straight': 4,
+    'flush': 3,
+    'pair': 2,
+    'high card': 1
+  };
+  const playerName = getThreeCardHandName(playerCards);
+  const dealerName = getThreeCardHandName(dealerCards);
+  const pr = handRank[playerName];
+  const dr = handRank[dealerName];
+
+  if (pr > dr) return 'player';
+  if (dr > pr) return 'dealer';
+
+  // Same rank — compare high cards
+  const rankOrder = 'AKQJT98765432';
+  const playerIndices = playerCards.map(c => rankOrder.indexOf(c[0])).sort((a, b) => a - b);
+  const dealerIndices = dealerCards.map(c => rankOrder.indexOf(c[0])).sort((a, b) => a - b);
+
+  for (let i = 0; i < 3; i++) {
+    if (playerIndices[i] < dealerIndices[i]) return 'player'; // lower index = higher rank
+    if (dealerIndices[i] < playerIndices[i]) return 'dealer';
+  }
+  return 'tie';
+}
+
+// ─── 3-Card Poker: Net change calculation ─────────────────────────────────────
+
+function computeNetChange3C(player, handResult) {
+  let net = 0;
+
+  if (!player.folded) {
+    // Ante result
+    if (handResult.anteResult === 'win') net += player.anteBet;
+    else if (handResult.anteResult === 'loss') net -= player.anteBet;
+    else if (handResult.anteResult === 'push') net += player.anteBet; // RETURN the already-deducted bet
+
+    // Play result (play bet was deducted at POST /api/3c-play)
+    if (handResult.playResult === 'win') net += player.playBet;
+    else if (handResult.playResult === 'loss') net -= player.playBet;
+    else if (handResult.playResult === 'push') net += player.playBet; // RETURN the already-deducted bet
+
+    // Ante bonus (independent of win/loss)
+    net += handResult.anteBonus;
+  }
+  // Folded: ante was already deducted at placement and is forfeited — do not add back or subtract again.
+
+  // Pair Plus (independent — collected even by folded players)
+  if (player.pairPlusBet > 0) {
+    if (handResult.pairPlusResult === 'win') net += handResult.pairPlusPayout;
+    else net -= player.pairPlusBet; // pairPlusBet was already deducted at placement
+  }
+
+  // Six Card Bonus (independent — collected even by folded players)
+  if (player.sixCardBet > 0) {
+    if (handResult.sixCardResult === 'win') net += handResult.sixCardPayout;
+    else net -= player.sixCardBet; // sixCardBet was already deducted at placement
+  }
+
+  return net;
+}
+
+// ─── 3-Card Poker: AI bet computation (sequential bankroll cap) ───────────────
+
+function computeAIBets3C(player, config) {
+  const { minBet, maxBet } = config;
+  const tier = player.skillTier;
+
+  if (player.status === 'bust' || player.bankroll <= 0) {
+    return { anteBet: 0, pairPlusBet: 0, sixCardBet: 0 };
+  }
+
+  // Step 1: Ante
+  let remaining = player.bankroll;
+  const targetAnte = (tier === 'loose-aggressive') ? maxBet : minBet;
+  const anteBet = Math.min(targetAnte, remaining);
+  remaining -= anteBet;
+
+  // Step 2: Pair Plus — decision is card-dependent for tight-aggressive
+  let pairPlusBet = 0;
+  let placePairPlus = false;
+  if (tier === 'loose-passive' || tier === 'loose-aggressive') {
+    placePairPlus = true;
+  } else if (tier === 'tight-aggressive') {
+    placePairPlus = hasPairOrBetter3C(player.cards); // cards are already dealt at this point
+  }
+
+  if (placePairPlus && remaining > 0) {
+    const targetPP = (tier === 'loose-aggressive') ? maxBet : minBet;
+    pairPlusBet = Math.min(targetPP, remaining);
+    remaining -= pairPlusBet;
+  }
+
+  // Step 3: Six Card Bonus — decision is card-dependent for tight-aggressive
+  let sixCardBet = 0;
+  let placeSixCard = false;
+  if (tier === 'loose-passive' || tier === 'loose-aggressive') {
+    placeSixCard = true;
+  } else if (tier === 'tight-aggressive') {
+    placeSixCard = hasSixCardBonus3C(player.cards); // cards are already dealt at this point
+  }
+
+  if (placeSixCard && remaining > 0) {
+    const targetSC = (tier === 'loose-aggressive') ? maxBet : minBet;
+    sixCardBet = Math.min(targetSC, remaining);
+    remaining -= sixCardBet;
+  }
+
+  return { anteBet, pairPlusBet, sixCardBet };
+}
+
+// ─── 3-Card Poker: AI play/fold decision ──────────────────────────────────────
+
+function computeAIPlayDecision3C(player) {
+  const tier = player.skillTier;
+  if (player.anteBet === 0) return 'fold'; // AI did not place ante (bust or sitting out)
+  if (tier === 'loose-passive') return 'play';
+  if (tier === 'loose-aggressive') return 'play';
+  if (tier === 'tight-aggressive') {
+    return shouldPlay3C(player.cards) ? 'play' : 'fold';
+  }
+  return 'fold'; // defensive default
+}
+
+// ─── 3-Card Poker: Hand reset ─────────────────────────────────────────────────
+
+function resetHand3C(gs) {
+  gs.dealer.cards = null;
+  gs.dealer.qualifies = null;
+  for (const player of gs.players) {
+    player.cards = null;
+    player.anteBet = 0;
+    player.playBet = 0;
+    player.pairPlusBet = 0;
+    player.sixCardBet = 0;
+    player.folded = false;
+    player.handResult = null;
+  }
+  gs.phase = 'betting';
+  // NOTE: does NOT reset bankroll, status, skillTier, id, name, seatIndex
+  // NOTE: does NOT increment handNumber — that is done in POST /api/3c-next-hand before calling this
+}
+
+// ─── 3-Card Poker: Serialization — ONLY exit path for 3-Card state ────────────
+
+function serializeState3C(gs) {
+  // POSITIVE CHECK: reveal dealer cards only at resolution/hand-complete phases
+  const revealDealer = gs.phase === 'resolution' || gs.phase === 'hand-complete';
+  return {
+    gameId: gs.gameId,
+    tournamentType: gs.tournamentType,
+    phase: gs.phase,
+    handNumber: gs.handNumber,
+    config: { ...gs.config },
+    humanStatus: gs.humanStatus,
+    dealer: {
+      cards: revealDealer ? gs.dealer.cards : null,
+      qualifies: revealDealer ? gs.dealer.qualifies : null
+    },
+    players: gs.players.map(p => ({
+      id: p.id,
+      name: p.name,
+      bankroll: p.bankroll,
+      seatIndex: p.seatIndex,
+      skillTier: p.skillTier,
+      status: p.status,
+      cards: gs.phase === 'betting' ? null : p.cards, // null during betting (cards not yet dealt)
+      anteBet: p.anteBet,
+      playBet: p.playBet,
+      pairPlusBet: p.pairPlusBet,
+      sixCardBet: p.sixCardBet,
+      folded: p.folded,
+      handResult: p.handResult
+    }))
+  };
+}
+
 // ─── Routes ────────────────────────────────────────────────────────────────────
 
 // POST /api/game — Start a new game
 app.post('/api/game', (req, res) => {
   // Validation — exact order, exact error messages
+
+  const { tournamentType } = req.body;
+
+  // Step 1: tournamentType whitelist check
+  if (!['holdem', 'fivecard', 'threecard'].includes(tournamentType)) {
+    return res.status(400).json({ error: 'tournamentType must be holdem, fivecard, or threecard.' });
+  }
+
+  // ─── 3-Card Poker branch ────────────────────────────────────────────────────
+  if (tournamentType === 'threecard') {
+    const { bankroll, minBet, maxBet } = req.body;
+
+    // Validate bankroll
+    if (!Number.isInteger(bankroll) || bankroll < 100 || bankroll > 1000000) {
+      return res.status(400).json({ error: 'bankroll must be an integer between 100 and 1000000.' });
+    }
+    // Validate minBet
+    if (!Number.isInteger(minBet) || minBet < 1 || minBet > 10000) {
+      return res.status(400).json({ error: 'minBet must be an integer between 1 and 10000.' });
+    }
+    // Validate maxBet
+    if (!Number.isInteger(maxBet) || maxBet < 1 || maxBet > 500000) {
+      return res.status(400).json({ error: 'maxBet must be an integer between 1 and 500000.' });
+    }
+    // maxBet >= minBet
+    if (maxBet < minBet) {
+      return res.status(400).json({ error: 'maxBet must be greater than or equal to minBet.' });
+    }
+
+    // aiCount, startingStack, handsPerLevel, blindSchedule are silently ignored for threecard
+    const skillTiers = ['loose-passive', 'tight-aggressive', 'loose-aggressive'];
+    const aiNames = ['Alex', 'Blake', 'Casey', 'Drew', 'Emery'];
+
+    const players = [];
+
+    // Human player
+    players.push({
+      id: 'human',
+      name: 'You',
+      bankroll: bankroll,
+      seatIndex: 0,
+      skillTier: null,
+      status: 'active',
+      cards: null,
+      anteBet: 0,
+      playBet: 0,
+      pairPlusBet: 0,
+      sixCardBet: 0,
+      folded: false,
+      handResult: null
+    });
+
+    // AI players (5 fixed players, indices 1-5)
+    for (let i = 1; i <= 5; i++) {
+      players.push({
+        id: `ai-${i}`,
+        name: aiNames[i - 1],
+        bankroll: bankroll,
+        seatIndex: i,
+        skillTier: skillTiers[Math.floor(Math.random() * 3)],
+        status: 'active',
+        cards: null,
+        anteBet: 0,
+        playBet: 0,
+        pairPlusBet: 0,
+        sixCardBet: 0,
+        folded: false,
+        handResult: null
+      });
+    }
+
+    gameState = {
+      gameId: crypto.randomUUID(),
+      tournamentType: 'threecard',
+      phase: 'betting',
+      players: players,
+      dealer: {
+        cards: null,
+        qualifies: null
+      },
+      handNumber: 1, // initialized to 1, not 0 (ADV-7)
+      config: {
+        bankroll: bankroll,
+        minBet: minBet,
+        maxBet: maxBet
+      },
+      humanStatus: 'playing'
+    };
+
+    // resetHand3C sets per-hand fields and phase — deck/cards are handled in /api/3c-bet
+    // (resetHand3C called here initializes the first hand's betting phase)
+    resetHand3C(gameState);
+
+    return res.status(200).json(serializeState3C(gameState));
+  }
+  // ─── End 3-Card Poker branch ────────────────────────────────────────────────
+
+  // Step 1b: 5-Card Draw player cap (only check when tournamentType is valid AND aiCount is an integer)
+  if (req.body.tournamentType === 'fivecard' && Number.isInteger(req.body.aiCount) && req.body.aiCount > 5) {
+    return res.status(400).json({ error: '5-Card Draw supports a maximum of 5 AI players (6 players total).' });
+  }
 
   // 1. aiCount
   if (!Number.isInteger(req.body.aiCount)) {
@@ -969,7 +1618,8 @@ app.post('/api/game', (req, res) => {
     isBigBlind: false,
     skillTier: null,
     seatIndex: 0,
-    hasActedThisRound: false
+    hasActedThisRound: false,
+    discardCount: req.body.tournamentType === 'fivecard' ? 0 : null
   });
 
   // AI players
@@ -987,12 +1637,14 @@ app.post('/api/game', (req, res) => {
       isBigBlind: false,
       skillTier: skillTiers[Math.floor(Math.random() * 3)],
       seatIndex: i,
-      hasActedThisRound: false
+      hasActedThisRound: false,
+      discardCount: req.body.tournamentType === 'fivecard' ? 0 : null
     });
   }
 
   gameState = {
     gameId: crypto.randomUUID(),
+    tournamentType: req.body.tournamentType,
     phase: 'pre-flop',
     players: players,
     communityCards: [],
@@ -1006,9 +1658,13 @@ app.post('/api/game', (req, res) => {
     bigBlind: blindSchedule[0].big,
     actionSeat: null,
     lastAggressorSeat: null,
+    drawSeat: null,
+    drawOrder: [],
+    drawIndex: 0,
     deck: [],
     humanStatus: 'playing',
     config: {
+      tournamentType: req.body.tournamentType,
       aiCount: aiCount,
       startingStack: startingStack,
       handsPerLevel: req.body.handsPerLevel,
@@ -1029,6 +1685,10 @@ app.post('/api/game', (req, res) => {
 app.get('/api/game', (req, res) => {
   if (!gameState) {
     return res.status(404).json({ error: 'No game in progress.' });
+  }
+  // 3-Card Poker uses its own serializer
+  if (gameState.tournamentType === 'threecard') {
+    return res.status(200).json(serializeState3C(gameState));
   }
   return res.status(200).json(serializeGameState(gameState));
 });
@@ -1052,8 +1712,13 @@ app.post('/api/action', (req, res) => {
     return res.status(404).json({ error: 'No game in progress.' });
   }
 
+  // Guard (CISO-V3-08): cross-type protection — 3-Card games must not use tournament endpoints
+  if (gameState.tournamentType === 'threecard') {
+    return res.status(400).json({ error: 'No action required at this time.' });
+  }
+
   // Rule 4
-  const activePhases = ['pre-flop', 'flop', 'turn', 'river'];
+  const activePhases = ['pre-flop', 'flop', 'turn', 'river', 'post-draw'];
   if (!activePhases.includes(gameState.phase)) {
     return res.status(400).json({ error: 'No action required at this time.' });
   }
@@ -1097,6 +1762,108 @@ app.post('/api/action', (req, res) => {
   return res.status(200).json(serializeGameState(gameState));
 });
 
+// POST /api/draw -- Human player draw action (5-Card Draw only)
+app.post('/api/draw', (req, res) => {
+  // Validation -- exact order, exact error messages
+  // ALL validation must complete before ANY game state mutation
+
+  // Step 1: gameId required
+  if (!req.body.gameId) {
+    return res.status(400).json({ error: 'gameId is required.' });
+  }
+
+  // Step 2: gameId must match
+  if (!gameState || req.body.gameId !== gameState.gameId) {
+    return res.status(400).json({ error: 'Invalid gameId.' });
+  }
+
+  // Step 3: game must exist (effectively unreachable given step 2, but implement for completeness)
+  if (!gameState) {
+    return res.status(404).json({ error: 'No game in progress.' });
+  }
+
+  // Guard (CISO-V3-08): cross-type protection — 3-Card games must not use tournament endpoints
+  if (gameState.tournamentType === 'threecard') {
+    return res.status(400).json({ error: 'This endpoint is only valid for tournament games.' });
+  }
+
+  // Step 4: tournament type must be fivecard
+  if (gameState.tournamentType !== 'fivecard') {
+    return res.status(400).json({ error: 'Draw action is only valid in 5-Card Draw games.' });
+  }
+
+  // Step 5: phase must be draw
+  if (gameState.phase !== 'draw') {
+    return res.status(400).json({ error: 'It is not the draw phase.' });
+  }
+
+  // Step 6: must be human's draw turn
+  const humanPlayer = gameState.players.find(p => p.id === 'human');
+  if (gameState.drawSeat !== humanPlayer.seatIndex) {
+    return res.status(400).json({ error: 'It is not your turn to draw.' });
+  }
+
+  // Step 7: discards must be an array
+  if (!Array.isArray(req.body.discards)) {
+    return res.status(400).json({ error: 'discards must be an array of 0 to 3 card strings.' });
+  }
+
+  // Step 7b: each element must be a string (type safety before card-in-hand check)
+  for (const element of req.body.discards) {
+    if (typeof element !== 'string') {
+      return res.status(400).json({ error: 'discards must be an array of 0 to 3 card strings.' });
+    }
+  }
+
+  // Step 8: max 3 discards
+  if (req.body.discards.length > 3) {
+    return res.status(400).json({ error: 'You may discard at most 3 cards.' });
+  }
+
+  // Step 9: each card must be in human's hand
+  for (const card of req.body.discards) {
+    if (!humanPlayer.holeCards.includes(card)) {
+      return res.status(400).json({ error: 'Invalid discard \u2014 card not in your hand.' });
+    }
+  }
+
+  // Step 10: no duplicates -- MUST use Set-based check
+  if (new Set(req.body.discards).size !== req.body.discards.length) {
+    return res.status(400).json({ error: 'Invalid discard \u2014 duplicate card.' });
+  }
+
+  // ==== ALL VALIDATION PASSED ==== Now mutate game state ====
+
+  const discards = req.body.discards;
+
+  // Process human's draw: remove discarded cards, deal replacements
+  humanPlayer.holeCards = humanPlayer.holeCards.filter(c => !discards.includes(c));
+  for (let i = 0; i < discards.length; i++) {
+    humanPlayer.holeCards.push(gameState.deck.pop());
+  }
+  humanPlayer.discardCount = discards.length;
+
+  // Defensive assertion: human must have exactly 5 cards after draw
+  if (humanPlayer.holeCards.length !== 5) {
+    // This should never happen given the 6-player cap, but guard defensively
+    return res.status(500).json({ error: 'Internal error during draw processing.' });
+  }
+
+  // Advance past human in draw order
+  gameState.drawIndex++;
+
+  // Continue processing remaining AI draws (processDraw picks up from drawIndex)
+  processDraw(gameState);
+
+  // If draw phase completed, processDraw set phase to 'post-draw'
+  // Now run AI betting actions for the post-draw round
+  if (gameState.phase !== 'draw') {
+    processAIActions(gameState);
+  }
+
+  return res.status(200).json(serializeGameState(gameState));
+});
+
 // POST /api/next-hand — Advance from hand-complete to next hand
 app.post('/api/next-hand', (req, res) => {
   // Validation — exact order, exact error messages
@@ -1111,14 +1878,19 @@ app.post('/api/next-hand', (req, res) => {
     return res.status(400).json({ error: 'Invalid gameId.' });
   }
 
-  // Rule 3
-  if (gameState.phase !== 'hand-complete') {
-    return res.status(400).json({ error: 'Hand is not complete yet.' });
-  }
-
   // Rule 4 — unreachable given rule 2, but implement for completeness
   if (!gameState) {
     return res.status(404).json({ error: 'No game in progress.' });
+  }
+
+  // Guard (CISO-V3-08): cross-type protection — inserted after gameId checks, before phase check
+  if (gameState.tournamentType === 'threecard') {
+    return res.status(400).json({ error: 'This endpoint is only valid for tournament games.' });
+  }
+
+  // Rule 3
+  if (gameState.phase !== 'hand-complete') {
+    return res.status(400).json({ error: 'Hand is not complete yet.' });
   }
 
   gameState.handNumber += 1;
@@ -1128,9 +1900,400 @@ app.post('/api/next-hand', (req, res) => {
   return res.status(200).json(serializeGameState(gameState));
 });
 
+// ─── 3-Card Poker Routes ───────────────────────────────────────────────────────
+
+// POST /api/3c-bet — Human places bets
+app.post('/api/3c-bet', (req, res) => {
+  const { gameId } = req.body;
+  const anteBet = req.body.anteBet;
+  const pairPlusBet = (req.body.pairPlusBet !== undefined) ? req.body.pairPlusBet : 0;
+  const sixCardBet = (req.body.sixCardBet !== undefined) ? req.body.sixCardBet : 0;
+
+  // Step 1: gameId missing
+  if (!gameId) {
+    return res.status(400).json({ error: 'gameId is required.' });
+  }
+
+  // Step 2: gameId mismatch (also handles null gameState)
+  if (!gameState || gameId !== gameState.gameId) {
+    return res.status(400).json({ error: 'Invalid gameId.' });
+  }
+
+  // Step 3: (unreachable) no game in progress
+  if (!gameState) {
+    return res.status(404).json({ error: 'No game in progress.' });
+  }
+
+  // Step 4: tournament type check
+  if (gameState.tournamentType !== 'threecard') {
+    return res.status(400).json({ error: 'This endpoint is only valid for 3-Card Poker games.' });
+  }
+
+  // Step 5: phase check
+  if (gameState.phase !== 'betting') {
+    return res.status(400).json({ error: 'Bets cannot be placed at this time.' });
+  }
+
+  // Step 5b: humanStatus check (CISO-V3-12)
+  if (gameState.humanStatus !== 'playing') {
+    return res.status(400).json({ error: 'Session is over.' });
+  }
+
+  // Step 6: anteBet must be a positive integer
+  if (!Number.isInteger(anteBet) || anteBet <= 0) {
+    return res.status(400).json({ error: 'anteBet must be a positive integer.' });
+  }
+
+  const minBet = gameState.config.minBet;
+  const maxBet = gameState.config.maxBet;
+  const humanPlayer = gameState.players.find(p => p.id === 'human');
+
+  // Step 7: anteBet below minimum
+  if (anteBet < minBet) {
+    return res.status(400).json({ error: 'Ante bet is below the table minimum.' });
+  }
+
+  // Step 8: anteBet above maximum
+  if (anteBet > maxBet) {
+    return res.status(400).json({ error: 'Ante bet exceeds the table maximum.' });
+  }
+
+  // Step 9: anteBet > bankroll
+  if (anteBet > humanPlayer.bankroll) {
+    return res.status(400).json({ error: 'Insufficient bankroll for ante bet.' });
+  }
+
+  // Normalize optional bets to 0
+  const ppBet = (Number.isInteger(pairPlusBet) && pairPlusBet !== 0) ? pairPlusBet : 0;
+  const scBet = (Number.isInteger(sixCardBet) && sixCardBet !== 0) ? sixCardBet : 0;
+
+  // Step 10: pairPlusBet range validation (if placing)
+  if (ppBet !== 0) {
+    if (!Number.isInteger(ppBet)) {
+      return res.status(400).json({ error: 'Pair Plus bet is below the table minimum.' });
+    }
+    if (ppBet < minBet) {
+      return res.status(400).json({ error: 'Pair Plus bet is below the table minimum.' });
+    }
+    if (ppBet > maxBet) {
+      return res.status(400).json({ error: 'Pair Plus bet exceeds the table maximum.' });
+    }
+  }
+
+  // Step 11: pairPlusBet > remaining after anteBet
+  if (ppBet > 0 && ppBet > (humanPlayer.bankroll - anteBet)) {
+    return res.status(400).json({ error: 'Insufficient bankroll for Pair Plus bet.' });
+  }
+
+  // Step 12: sixCardBet range validation (if placing)
+  if (scBet !== 0) {
+    if (!Number.isInteger(scBet)) {
+      return res.status(400).json({ error: 'Six Card Bonus bet is below the table minimum.' });
+    }
+    if (scBet < minBet) {
+      return res.status(400).json({ error: 'Six Card Bonus bet is below the table minimum.' });
+    }
+    if (scBet > maxBet) {
+      return res.status(400).json({ error: 'Six Card Bonus bet exceeds the table maximum.' });
+    }
+  }
+
+  // Step 13: sixCardBet > remaining after anteBet + pairPlusBet
+  if (scBet > 0 && scBet > (humanPlayer.bankroll - anteBet - ppBet)) {
+    return res.status(400).json({ error: 'Insufficient bankroll for Six Card Bonus bet.' });
+  }
+
+  // Step 14: total safety catch
+  if ((anteBet + ppBet + scBet) > humanPlayer.bankroll) {
+    return res.status(400).json({ error: 'Insufficient bankroll for total bets.' });
+  }
+
+  // ==== ALL 14 VALIDATION STEPS PASSED — BEGIN MUTATION ====
+
+  // Mutation 1: Store bets and deduct from bankroll
+  humanPlayer.anteBet = anteBet;
+  humanPlayer.pairPlusBet = ppBet;
+  humanPlayer.sixCardBet = scBet;
+  humanPlayer.bankroll -= (anteBet + ppBet + scBet);
+
+  // Mutation 2: Build and shuffle a fresh 52-card deck
+  const deck = shuffle(buildDeck());
+
+  // Mutation 3: Deal 3 cards to human, each active AI, then dealer
+  // Deal human first
+  humanPlayer.cards = [deck.pop(), deck.pop(), deck.pop()];
+
+  // Deal to each active (non-bust) AI
+  const aiPlayers = gameState.players.filter(p => p.id !== 'human');
+  for (const ai of aiPlayers) {
+    if (ai.status !== 'bust') {
+      ai.cards = [deck.pop(), deck.pop(), deck.pop()];
+    }
+  }
+
+  // Deal dealer cards (stored server-side, serializeState3C hides them until resolution)
+  gameState.dealer.cards = [deck.pop(), deck.pop(), deck.pop()];
+
+  // Mutation 4: Compute AI bets (sequential bankroll cap) and deduct
+  for (const ai of aiPlayers) {
+    if (ai.status === 'bust' || ai.bankroll <= 0) continue;
+    const bets = computeAIBets3C(ai, gameState.config);
+    ai.anteBet = bets.anteBet;
+    ai.pairPlusBet = bets.pairPlusBet;
+    ai.sixCardBet = bets.sixCardBet;
+    ai.bankroll -= (bets.anteBet + bets.pairPlusBet + bets.sixCardBet);
+  }
+
+  // Mutation 5: Compute AI play/fold decisions
+  for (const ai of aiPlayers) {
+    if (ai.status === 'bust' || ai.anteBet === 0) continue;
+    const decision = computeAIPlayDecision3C(ai);
+    if (decision === 'play') {
+      // Cap play bet to remaining bankroll after ante+pairPlus+sixCard already deducted
+      const maxPlayBet = Math.max(0, ai.bankroll);
+      const playAmt = Math.min(ai.anteBet, maxPlayBet);
+      ai.playBet = playAmt;
+      ai.bankroll -= playAmt;
+    } else {
+      ai.folded = true;
+      ai.playBet = 0;
+      // anteBet already deducted — forfeited to house
+    }
+  }
+
+  // Mutation 6: Advance to dealing phase
+  gameState.phase = 'dealing';
+
+  return res.status(200).json(serializeState3C(gameState));
+});
+
+// POST /api/3c-play — Human decides to play or fold
+app.post('/api/3c-play', (req, res) => {
+  const { gameId, decision } = req.body;
+
+  // Step 1: gameId missing
+  if (!gameId) {
+    return res.status(400).json({ error: 'gameId is required.' });
+  }
+
+  // Step 2: gameId mismatch
+  if (!gameState || gameId !== gameState.gameId) {
+    return res.status(400).json({ error: 'Invalid gameId.' });
+  }
+
+  // Step 3: (unreachable) no game in progress
+  if (!gameState) {
+    return res.status(404).json({ error: 'No game in progress.' });
+  }
+
+  // Step 4: tournament type check
+  if (gameState.tournamentType !== 'threecard') {
+    return res.status(400).json({ error: 'This endpoint is only valid for 3-Card Poker games.' });
+  }
+
+  // Step 5: phase check
+  if (gameState.phase !== 'dealing') {
+    return res.status(400).json({ error: 'No play decision required at this time.' });
+  }
+
+  // Step 6: decision must be 'play' or 'fold' (strict equality, no normalization)
+  if (decision !== 'play' && decision !== 'fold') {
+    return res.status(400).json({ error: "Decision must be 'play' or 'fold'." });
+  }
+
+  // ==== ALL VALIDATION PASSED — BEGIN MUTATION ====
+
+  const humanPlayer = gameState.players.find(p => p.id === 'human');
+
+  // Resolution — wrap all mutations including play bet deduction in try/catch
+  // so that if pokersolver throws, the deduction has not been partially applied.
+  try {
+    // Apply human's decision — INSIDE try/catch for atomicity
+    if (decision === 'play') {
+      humanPlayer.playBet = humanPlayer.anteBet;
+      humanPlayer.bankroll -= humanPlayer.playBet;
+    } else {
+      // fold
+      humanPlayer.folded = true;
+      humanPlayer.playBet = 0;
+      // anteBet was already deducted — forfeited to house
+    }
+
+    // Step 1: Reveal dealer
+    gameState.dealer.qualifies = dealerQualifies3C(gameState.dealer.cards);
+
+    // Step 2: Process EVERY player (including folded ones — ADV-9)
+    for (const player of gameState.players) {
+      if (player.status === 'bust') continue; // bust players did not play this hand
+
+      const handResult = {
+        anteResult: null,
+        playResult: null,
+        pairPlusResult: null,
+        sixCardResult: null,
+        anteBonus: 0,
+        pairPlusPayout: 0,
+        sixCardPayout: 0,
+        netChange: 0
+      };
+
+      // a. Ante bonus (only for non-folded players)
+      handResult.anteBonus = player.folded ? 0 : anteBonus3C(player.cards, player.anteBet);
+
+      // b. Ante/Play result
+      if (player.folded) {
+        handResult.anteResult = 'loss';
+        handResult.playResult = null;
+      } else {
+        if (!gameState.dealer.qualifies) {
+          handResult.anteResult = 'win';
+          handResult.playResult = 'push';
+        } else {
+          const comparison = compareHands3C(player.cards, gameState.dealer.cards);
+          if (comparison === 'player') {
+            handResult.anteResult = 'win';
+            handResult.playResult = 'win';
+          } else if (comparison === 'dealer') {
+            handResult.anteResult = 'loss';
+            handResult.playResult = 'loss';
+          } else {
+            // tie
+            handResult.anteResult = 'push';
+            handResult.playResult = 'push';
+          }
+        }
+      }
+
+      // c. Pair Plus (ALL players, including folded)
+      const rawPP = pairPlusPayout3C(player.cards, player.pairPlusBet);
+      handResult.pairPlusPayout = rawPP; // 0 on loss (never negative)
+      handResult.pairPlusResult = rawPP > 0 ? 'win' : (player.pairPlusBet > 0 ? 'loss' : null);
+
+      // d. Six Card Bonus (ALL players, including folded — ADV-9)
+      const rawSC = sixCardPayout3C(player.cards, gameState.dealer.cards, player.sixCardBet);
+      handResult.sixCardPayout = rawSC; // 0 on loss (never negative)
+      handResult.sixCardResult = rawSC > 0 ? 'win' : (player.sixCardBet > 0 ? 'loss' : null);
+
+      // e. Compute net change
+      handResult.netChange = computeNetChange3C(player, handResult);
+
+      // f. Store handResult and apply net change to bankroll
+      player.handResult = handResult;
+      player.bankroll += handResult.netChange;
+    }
+
+    // Step 3: Mark any player with bankroll <= 0 as bust
+    for (const player of gameState.players) {
+      if (player.bankroll <= 0 && player.status !== 'bust') {
+        player.status = 'bust';
+      }
+    }
+
+    // Step 4: Set phase to hand-complete
+    gameState.phase = 'hand-complete';
+
+    // Step 5: Check if human is bust or game-over
+    if (humanPlayer.bankroll <= 0) {
+      gameState.humanStatus = 'bust';
+      gameState.phase = 'game-over';
+    }
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'An internal error occurred.' });
+  }
+
+  return res.status(200).json(serializeState3C(gameState));
+});
+
+// POST /api/3c-next-hand — Advance to next hand
+app.post('/api/3c-next-hand', (req, res) => {
+  const { gameId } = req.body;
+
+  // Step 1: gameId missing
+  if (!gameId) {
+    return res.status(400).json({ error: 'gameId is required.' });
+  }
+
+  // Step 2: gameId mismatch
+  if (!gameState || gameId !== gameState.gameId) {
+    return res.status(400).json({ error: 'Invalid gameId.' });
+  }
+
+  // Step 3: (unreachable) no game in progress
+  if (!gameState) {
+    return res.status(404).json({ error: 'No game in progress.' });
+  }
+
+  // Step 4: tournament type check
+  if (gameState.tournamentType !== 'threecard') {
+    return res.status(400).json({ error: 'This endpoint is only valid for 3-Card Poker games.' });
+  }
+
+  // Step 5: session is over — check before phase check so cashedout/bust returns correct message
+  // (after cashout, phase is 'game-over', not 'hand-complete', so this must fire first)
+  if (gameState.humanStatus === 'bust' || gameState.humanStatus === 'cashedout') {
+    return res.status(400).json({ error: 'Session is over.' });
+  }
+
+  // Step 6: phase check
+  if (gameState.phase !== 'hand-complete') {
+    return res.status(400).json({ error: 'Hand is not complete yet.' });
+  }
+
+  // Increment handNumber first, then reset hand
+  gameState.handNumber += 1;
+  resetHand3C(gameState); // sets per-hand fields to defaults, phase to 'betting'
+
+  return res.status(200).json(serializeState3C(gameState));
+});
+
+// POST /api/3c-cashout — Human cashes out
+app.post('/api/3c-cashout', (req, res) => {
+  const { gameId } = req.body;
+
+  // Step 1: gameId missing
+  if (!gameId) {
+    return res.status(400).json({ error: 'gameId is required.' });
+  }
+
+  // Step 2: gameId mismatch
+  if (!gameState || gameId !== gameState.gameId) {
+    return res.status(400).json({ error: 'Invalid gameId.' });
+  }
+
+  // Step 3: (unreachable) no game in progress
+  if (!gameState) {
+    return res.status(404).json({ error: 'No game in progress.' });
+  }
+
+  // Step 4: tournament type check
+  if (gameState.tournamentType !== 'threecard') {
+    return res.status(400).json({ error: 'This endpoint is only valid for 3-Card Poker games.' });
+  }
+
+  // Step 5: can only cash out between hands (betting or hand-complete)
+  if (gameState.phase !== 'betting' && gameState.phase !== 'hand-complete') {
+    return res.status(400).json({ error: 'You can only cash out between hands.' });
+  }
+
+  // CISO-V3-07: exactly two mutations, nothing else
+  gameState.humanStatus = 'cashedout';
+  gameState.phase = 'game-over';
+
+  return res.status(200).json(serializeState3C(gameState));
+});
+
 // GET /api/health — Health check
 app.get('/api/health', (req, res) => {
   return res.status(200).json({ status: 'ok' });
+});
+
+// ─── Global error handler (CISO-V3-06) ────────────────────────────────────────
+// Suppresses stack traces from reaching HTTP responses
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: 'An internal error occurred.' });
 });
 
 // ─── Port selection and startup ────────────────────────────────────────────────
