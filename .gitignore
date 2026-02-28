@@ -18,3 +18,4 @@ test-results/
 ui-tests*.js
 ui-tests*.spec.js
 playwright.config.js
+spec-archive/
