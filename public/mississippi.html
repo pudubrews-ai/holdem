@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mississippi Stud</title>
+  <link rel="stylesheet" href="/mississippi.css">
+</head>
+<body>
+
+  <div class="ms-page">
+
+    <!-- Header -->
+    <div class="ms-header">
+      <a href="/" class="ms-back-link">Back to Menu</a>
+      <h1 class="ms-title">Mississippi Stud</h1>
+      <div class="ms-header-status">
+        <span class="ms-status-label">Session:</span>
+        <span data-testid="display-session-status" class="ms-session-status">Inactive</span>
+        <span class="ms-status-label">Hand:</span>
+        <span data-testid="display-phase" class="ms-phase-display">Idle</span>
+      </div>
+    </div>
+
+    <!-- Table Area -->
+    <div class="ms-table">
+
+      <!-- AI Seats (top row) -->
+      <div class="ms-ai-seats">
+
+        <div class="ms-ai-seat" data-testid="ai-seat-1">
+          <span data-testid="ai-name-1" class="ms-ai-name">Seat 1</span>
+          <div class="ms-ai-cards" id="ai-cards-1"></div>
+          <span data-testid="ai-action-1" class="ms-ai-action">&#8212;</span>
+        </div>
+
+        <div class="ms-ai-seat" data-testid="ai-seat-2">
+          <span data-testid="ai-name-2" class="ms-ai-name">Seat 2</span>
+          <div class="ms-ai-cards" id="ai-cards-2"></div>
+          <span data-testid="ai-action-2" class="ms-ai-action">&#8212;</span>
+        </div>
+
+        <div class="ms-ai-seat" data-testid="ai-seat-3">
+          <span data-testid="ai-name-3" class="ms-ai-name">Seat 3</span>
+          <div class="ms-ai-cards" id="ai-cards-3"></div>
+          <span data-testid="ai-action-3" class="ms-ai-action">&#8212;</span>
+        </div>
+
+        <div class="ms-ai-seat" data-testid="ai-seat-4">
+          <span data-testid="ai-name-4" class="ms-ai-name">Seat 4</span>
+          <div class="ms-ai-cards" id="ai-cards-4"></div>
+          <span data-testid="ai-action-4" class="ms-ai-action">&#8212;</span>
+        </div>
+
+        <div class="ms-ai-seat" data-testid="ai-seat-5">
+          <span data-testid="ai-name-5" class="ms-ai-name">Seat 5</span>
+          <div class="ms-ai-cards" id="ai-cards-5"></div>
+          <span data-testid="ai-action-5" class="ms-ai-action">&#8212;</span>
+        </div>
+
+      </div><!-- end .ms-ai-seats -->
+
+      <!-- Community Cards (center) -->
+      <div class="ms-community">
+        <div class="ms-community-label">Community Cards</div>
+        <div class="ms-community-cards">
+          <div data-testid="card-community-0" class="ms-card-slot ms-card-placeholder">?</div>
+          <div data-testid="card-community-1" class="ms-card-slot ms-card-placeholder">?</div>
+        </div>
+      </div>
+
+      <!-- Human Seat (bottom center) -->
+      <div class="ms-human-seat">
+        <div class="ms-human-label">Your Hand</div>
+        <div class="ms-human-cards">
+          <div data-testid="card-hole-0" class="ms-card-slot ms-card-placeholder">?</div>
+          <div data-testid="card-hole-1" class="ms-card-slot ms-card-placeholder">?</div>
+          <div data-testid="card-hole-2" class="ms-card-slot ms-card-placeholder">?</div>
+        </div>
+      </div>
+
+    </div><!-- end .ms-table -->
+
+    <!-- Result / Hand Name strip -->
+    <div class="ms-result-strip">
+      <span class="ms-result-label">Hand:</span>
+      <span data-testid="display-hand-name" class="ms-hand-name"></span>
+      <span data-testid="display-result" class="ms-result"></span>
+      <span data-testid="display-bonus-result" class="ms-bonus-result"></span>
+    </div>
+
+    <!-- Error Display -->
+    <div data-testid="display-error" class="ms-error"></div>
+
+    <!-- Action Panel -->
+    <div class="ms-action-panel">
+
+      <!-- Bankroll and bets row -->
+      <div class="ms-info-row">
+        <div class="ms-bankroll-block">
+          <span class="ms-info-label">Bankroll</span>
+          <span data-testid="display-bankroll" class="ms-bankroll">$0</span>
+        </div>
+        <div class="ms-bets-block">
+          <div class="ms-bet-item">
+            <span class="ms-bet-label">Ante</span>
+            <span data-testid="display-bet-ante" class="ms-bet-value">$0</span>
+          </div>
+          <div class="ms-bet-item">
+            <span class="ms-bet-label">3rd St</span>
+            <span data-testid="display-bet-third" class="ms-bet-value">$0</span>
+          </div>
+          <div class="ms-bet-item">
+            <span class="ms-bet-label">4th St</span>
+            <span data-testid="display-bet-fourth" class="ms-bet-value">$0</span>
+          </div>
+          <div class="ms-bet-item">
+            <span class="ms-bet-label">5th St</span>
+            <span data-testid="display-bet-fifth" class="ms-bet-value">$0</span>
+          </div>
+          <div class="ms-bet-item">
+            <span class="ms-bet-label">Bonus</span>
+            <span data-testid="display-bet-bonus" class="ms-bet-value">$0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Button row -->
+      <div class="ms-button-row">
+
+        <button data-testid="btn-new-session" class="ms-btn ms-btn-session">New Session</button>
+
+        <div class="ms-deal-group">
+          <label class="ms-input-label" for="ms-ante-input">Ante ($5-$25)</label>
+          <input type="number" id="ms-ante-input" data-testid="input-ante" class="ms-input" min="5" max="25" value="10">
+          <label class="ms-input-label" for="ms-bonus-input">Bonus (opt)</label>
+          <input type="number" id="ms-bonus-input" data-testid="input-bonus" class="ms-input" min="0" max="25" value="0">
+          <button data-testid="btn-deal" class="ms-btn ms-btn-deal" disabled>Deal</button>
+        </div>
+
+        <button data-testid="btn-raise-1x" class="ms-btn ms-btn-raise" disabled>Raise 1x</button>
+        <button data-testid="btn-raise-3x" class="ms-btn ms-btn-raise" disabled>Raise 3x</button>
+        <button data-testid="btn-fold" class="ms-btn ms-btn-fold" disabled>Fold</button>
+        <button data-testid="btn-cash-out" class="ms-btn ms-btn-cashout" disabled>Cash Out</button>
+
+      </div>
+
+    </div><!-- end .ms-action-panel -->
+
+    <!-- Pay Tables (static, never updated by JS) -->
+    <div class="ms-paytables">
+
+      <div class="ms-paytable">
+        <table class="ms-paytable-table">
+          <caption>Main Hand Pay Table</caption>
+          <thead>
+            <tr><th>Hand</th><th>Payout</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Royal Flush</td><td>500:1</td></tr>
+            <tr><td>Straight Flush</td><td>100:1</td></tr>
+            <tr><td>Four of a Kind</td><td>40:1</td></tr>
+            <tr><td>Full House</td><td>10:1</td></tr>
+            <tr><td>Flush</td><td>6:1</td></tr>
+            <tr><td>Straight</td><td>4:1</td></tr>
+            <tr><td>Three of a Kind</td><td>3:1</td></tr>
+            <tr><td>Two Pair</td><td>2:1</td></tr>
+            <tr><td>Pair of Jacks-Aces</td><td>1:1</td></tr>
+            <tr><td>Pair of 6s-10s</td><td>Push</td></tr>
+            <tr><td>Pair of 2s-5s</td><td>Lose</td></tr>
+            <tr><td>No Pair or Worse</td><td>Lose</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="ms-paytable">
+        <table class="ms-paytable-table">
+          <caption>3 Card Bonus Pay Table</caption>
+          <thead>
+            <tr><th>Hand (3 Cards)</th><th>Payout</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Mini Royal (A-K-Q suited)</td><td>50:1</td></tr>
+            <tr><td>Straight Flush</td><td>40:1</td></tr>
+            <tr><td>Three of a Kind</td><td>30:1</td></tr>
+            <tr><td>Straight</td><td>6:1</td></tr>
+            <tr><td>Flush</td><td>3:1</td></tr>
+            <tr><td>Pair</td><td>1:1</td></tr>
+            <tr><td>High Card</td><td>Lose</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end .ms-paytables -->
+
+  </div><!-- end .ms-page -->
+
+  <script src="/mississippi.js"></script>
+</body>
+</html>

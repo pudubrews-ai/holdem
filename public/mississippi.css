@@ -1,0 +1,536 @@
+/* Mississippi Stud — Game Styles */
+/* Min width: 1024px. Dark green casino table aesthetic. */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #1a1a1a;
+  color: #e8e8e8;
+  min-width: 1024px;
+}
+
+/* ============================================================
+   PAGE LAYOUT
+   ============================================================ */
+
+.ms-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.ms-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #111;
+  padding: 10px 20px;
+  border-bottom: 2px solid #3a7a3a;
+}
+
+.ms-back-link {
+  color: #8fc88f;
+  text-decoration: none;
+  font-size: 0.9em;
+}
+
+.ms-back-link:hover {
+  color: #bef7be;
+  text-decoration: underline;
+}
+
+.ms-title {
+  font-size: 1.6em;
+  color: #d4af37;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+
+.ms-header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.ms-status-label {
+  color: #aaa;
+}
+
+.ms-session-status {
+  font-weight: bold;
+  color: #8fc88f;
+}
+
+.ms-phase-display {
+  font-weight: bold;
+  color: #d4af37;
+  background: #2a2a2a;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ============================================================
+   TABLE AREA — felt green background
+   ============================================================ */
+
+.ms-table {
+  flex: 1;
+  background: radial-gradient(ellipse at center, #2d6a2d 0%, #1a4a1a 70%, #0e300e 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px;
+  min-height: 340px;
+  position: relative;
+  border-bottom: 3px solid #3a7a3a;
+}
+
+/* ============================================================
+   AI SEATS — 5 across the top
+   ============================================================ */
+
+.ms-ai-seats {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.ms-ai-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid #3a7a3a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 160px;
+  max-width: 200px;
+  flex: 1;
+}
+
+.ms-ai-seat.folded {
+  opacity: 0.5;
+}
+
+.ms-ai-name {
+  font-weight: bold;
+  color: #d4af37;
+  font-size: 0.9em;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.ms-ai-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  min-height: 28px;
+  margin-bottom: 4px;
+}
+
+.ms-ai-action {
+  font-size: 0.8em;
+  color: #b0b0b0;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+/* ============================================================
+   COMMUNITY CARDS (center)
+   ============================================================ */
+
+.ms-community {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.ms-community-label {
+  font-size: 0.75em;
+  color: #8fc88f;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.ms-community-cards {
+  display: flex;
+  gap: 12px;
+}
+
+/* ============================================================
+   HUMAN SEAT (bottom center)
+   ============================================================ */
+
+.ms-human-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ms-human-label {
+  font-size: 0.75em;
+  color: #d4af37;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.ms-human-cards {
+  display: flex;
+  gap: 12px;
+}
+
+/* ============================================================
+   CARD SLOTS & CARD DISPLAY
+   ============================================================ */
+
+.ms-card-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 78px;
+  background: #fff;
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 1.3em;
+  font-weight: bold;
+  color: #333;
+  cursor: default;
+  user-select: none;
+}
+
+.ms-card-placeholder {
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px dashed #4a9a4a;
+  color: #4a9a4a;
+}
+
+/* Card spans used for AI showdown reveal */
+.ms-card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 48px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85em;
+  font-weight: bold;
+  cursor: default;
+  user-select: none;
+}
+
+/* ============================================================
+   RESULT STRIP
+   ============================================================ */
+
+.ms-result-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #111;
+  padding: 8px 20px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-wrap: wrap;
+  min-height: 36px;
+}
+
+.ms-result-label {
+  color: #aaa;
+  font-size: 0.9em;
+}
+
+.ms-hand-name {
+  font-weight: bold;
+  color: #d4af37;
+  font-size: 1em;
+}
+
+.ms-result {
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+.ms-bonus-result {
+  font-size: 0.9em;
+  color: #8fc88f;
+}
+
+/* ============================================================
+   ERROR DISPLAY
+   ============================================================ */
+
+.ms-error {
+  text-align: center;
+  color: #ff6b6b;
+  background: rgba(200, 0, 0, 0.1);
+  padding: 6px 20px;
+  font-size: 0.9em;
+  min-height: 28px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.ms-error:empty {
+  padding: 0;
+  min-height: 0;
+  border-bottom: none;
+}
+
+/* ============================================================
+   ACTION PANEL
+   ============================================================ */
+
+.ms-action-panel {
+  background: #1e1e1e;
+  border-top: 2px solid #3a7a3a;
+  padding: 12px 20px;
+}
+
+/* Info row: bankroll + bet displays */
+.ms-info-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.ms-bankroll-block {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ms-info-label {
+  color: #aaa;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.ms-bankroll {
+  font-size: 1.4em;
+  font-weight: bold;
+  color: #d4af37;
+}
+
+.ms-bets-block {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ms-bet-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.ms-bet-label {
+  font-size: 0.7em;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ms-bet-value {
+  font-size: 0.95em;
+  font-weight: bold;
+  color: #e8e8e8;
+}
+
+/* Button row */
+.ms-button-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* All buttons */
+.ms-btn {
+  padding: 9px 18px;
+  font-size: 0.9em;
+  font-weight: bold;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+
+.ms-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ms-btn-session {
+  background: #2c5f2c;
+  color: #fff;
+}
+
+.ms-btn-session:not(:disabled):hover {
+  background: #3a7a3a;
+}
+
+.ms-btn-deal {
+  background: #d4af37;
+  color: #111;
+}
+
+.ms-btn-deal:not(:disabled):hover {
+  background: #f0cc55;
+}
+
+.ms-btn-raise {
+  background: #2a5a9a;
+  color: #fff;
+}
+
+.ms-btn-raise:not(:disabled):hover {
+  background: #3a6fbf;
+}
+
+.ms-btn-fold {
+  background: #7a2a2a;
+  color: #fff;
+}
+
+.ms-btn-fold:not(:disabled):hover {
+  background: #9a3a3a;
+}
+
+.ms-btn-cashout {
+  background: #4a4a1a;
+  color: #d4af37;
+  border: 1px solid #d4af37;
+}
+
+.ms-btn-cashout:not(:disabled):hover {
+  background: #6a6a2a;
+}
+
+/* Deal group: inputs + deal button inline */
+.ms-deal-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.ms-input-label {
+  font-size: 0.75em;
+  color: #aaa;
+  white-space: nowrap;
+}
+
+.ms-input {
+  width: 60px;
+  padding: 5px 6px;
+  font-size: 0.9em;
+  background: #2a2a2a;
+  color: #e8e8e8;
+  border: 1px solid #4a4a4a;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.ms-input:focus {
+  outline: 1px solid #d4af37;
+  border-color: #d4af37;
+}
+
+/* ============================================================
+   PAY TABLES
+   ============================================================ */
+
+.ms-paytables {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 16px 20px;
+  background: #151515;
+  flex-wrap: wrap;
+}
+
+.ms-paytable {
+  flex: 0 0 auto;
+}
+
+.ms-paytable-table {
+  border-collapse: collapse;
+  font-size: 0.8em;
+  min-width: 240px;
+}
+
+.ms-paytable-table caption {
+  font-weight: bold;
+  color: #d4af37;
+  text-align: left;
+  padding-bottom: 6px;
+  font-size: 1.05em;
+  letter-spacing: 0.5px;
+}
+
+.ms-paytable-table th {
+  text-align: left;
+  color: #aaa;
+  padding: 3px 8px;
+  border-bottom: 1px solid #3a3a3a;
+}
+
+.ms-paytable-table th:last-child {
+  text-align: right;
+}
+
+.ms-paytable-table td {
+  padding: 3px 8px;
+  color: #ccc;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.ms-paytable-table td:last-child {
+  text-align: right;
+  color: #8fc88f;
+  font-weight: bold;
+}
+
+/* ============================================================
+   RESULT COLOR UTILITIES
+   ============================================================ */
+
+.ms-result-win {
+  color: #4caf50;
+}
+
+.ms-result-loss {
+  color: #f44336;
+}
+
+.ms-result-push {
+  color: #9e9e9e;
+}

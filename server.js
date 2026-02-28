@@ -31,9 +31,10 @@ const stateContainer = { game: null };
 
 // ─── Game module factory calls (no try/catch — crash on failure) ─────────────
 
-const holdemRouter    = require('./games/holdem')(stateContainer);
-const threecardRouter = require('./games/threecard')(stateContainer);
-const letitRideRouter = require('./games/letitride')(stateContainer);
+const holdemRouter      = require('./games/holdem')(stateContainer);
+const threecardRouter   = require('./games/threecard')(stateContainer);
+const letitRideRouter   = require('./games/letitride')(stateContainer);
+const mississippiRouter = require('./games/mississippi')(stateContainer);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ app.get('/api/game', (req, res) => {
 app.use('/', holdemRouter);
 app.use('/', threecardRouter);
 app.use('/', letitRideRouter);
+app.use('/', mississippiRouter);
 
 // ─── Global error handler (CISO-V3-06) ────────────────────────────────────────
 // Suppresses stack traces from reaching HTTP responses
@@ -114,7 +116,7 @@ findPort().then((port) => {
   app.listen(port, () => {
     console.log(`Poker server running on port ${port}`);
     fs.writeFileSync(
-      path.join(__dirname, 'reports', 'v5', 'server-port.md'),
+      path.join(__dirname, 'reports', 'v6', 'server-port.md'),
       `PORT=${port}\nPID=${process.pid}\n`
     );
   });
