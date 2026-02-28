@@ -1135,6 +1135,389 @@ body {
 }
 
 /* ============================================================
+   Let It Ride Screen
+   ============================================================ */
+#screen-letitride {
+    position: relative;
+    width: 100vw;
+    min-height: 100vh;
+    background-color: #0d0d0d;
+    overflow-x: hidden;
+    padding-bottom: 40px;
+}
+
+.lir-header {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 20px;
+    background: rgba(0, 0, 0, 0.6);
+    border-bottom: 1px solid #333;
+    font-size: 20px;
+    font-weight: bold;
+    color: #f0c040;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.lir-header [data-testid="lir-hand-number"] {
+    font-size: 15px;
+    color: #ccc;
+    font-weight: normal;
+    text-transform: none;
+}
+
+.lir-header [data-testid="lir-table-limits"] {
+    font-size: 13px;
+    color: #aaa;
+    font-weight: normal;
+    text-transform: none;
+}
+
+/* Community card area */
+.lir-community {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 28px 0 20px;
+}
+
+.lir-community-card {
+    width: 60px;
+    height: 84px;
+    border: 1px solid #555;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+    font-weight: bold;
+    background: #fff;
+    color: #111;
+}
+
+.lir-community-card.card-back {
+    background: #2244aa;
+    border-color: #335599;
+    color: #aabbff;
+}
+
+.lir-community-card:not(.card-back):not(.card-face) {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+/* Player seats */
+.lir-seats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 15px;
+    margin: 20px auto;
+    max-width: 960px;
+    padding: 0 20px;
+}
+
+.lir-seat {
+    border: 2px solid #555;
+    border-radius: 8px;
+    padding: 10px 8px;
+    min-width: 145px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.65);
+    font-size: 12px;
+}
+
+/* Seat 0 is the human — highlight with gold border */
+[data-testid="lir-seat-0"] {
+    border-color: #f0c040;
+    background: rgba(0, 0, 0, 0.78);
+}
+
+[data-testid="lir-seat-0-name"],
+[data-testid="lir-seat-1-name"],
+[data-testid="lir-seat-2-name"],
+[data-testid="lir-seat-3-name"],
+[data-testid="lir-seat-4-name"],
+[data-testid="lir-seat-5-name"] {
+    display: block;
+    font-weight: bold;
+    color: #e0e0e0;
+    font-size: 13px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+[data-testid="lir-seat-0-bankroll"],
+[data-testid="lir-seat-1-bankroll"],
+[data-testid="lir-seat-2-bankroll"],
+[data-testid="lir-seat-3-bankroll"],
+[data-testid="lir-seat-4-bankroll"],
+[data-testid="lir-seat-5-bankroll"] {
+    display: block;
+    color: #aaa;
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+[data-testid="lir-seat-0-bet1"],
+[data-testid="lir-seat-1-bet1"],
+[data-testid="lir-seat-2-bet1"],
+[data-testid="lir-seat-3-bet1"],
+[data-testid="lir-seat-4-bet1"],
+[data-testid="lir-seat-5-bet1"],
+[data-testid="lir-seat-0-bet2"],
+[data-testid="lir-seat-1-bet2"],
+[data-testid="lir-seat-2-bet2"],
+[data-testid="lir-seat-3-bet2"],
+[data-testid="lir-seat-4-bet2"],
+[data-testid="lir-seat-5-bet2"],
+[data-testid="lir-seat-0-bet3"],
+[data-testid="lir-seat-1-bet3"],
+[data-testid="lir-seat-2-bet3"],
+[data-testid="lir-seat-3-bet3"],
+[data-testid="lir-seat-4-bet3"],
+[data-testid="lir-seat-5-bet3"],
+[data-testid="lir-seat-0-bonus"],
+[data-testid="lir-seat-1-bonus"],
+[data-testid="lir-seat-2-bonus"],
+[data-testid="lir-seat-3-bonus"],
+[data-testid="lir-seat-4-bonus"],
+[data-testid="lir-seat-5-bonus"] {
+    display: block;
+    font-size: 10px;
+    color: #f0c040;
+    min-height: 14px;
+    line-height: 14px;
+}
+
+[data-testid="lir-seat-0-result"],
+[data-testid="lir-seat-1-result"],
+[data-testid="lir-seat-2-result"],
+[data-testid="lir-seat-3-result"],
+[data-testid="lir-seat-4-result"],
+[data-testid="lir-seat-5-result"] {
+    display: block;
+    font-size: 13px;
+    font-weight: bold;
+    min-height: 16px;
+    line-height: 16px;
+    color: #66ff88;
+}
+
+[data-testid="lir-seat-0-status"],
+[data-testid="lir-seat-1-status"],
+[data-testid="lir-seat-2-status"],
+[data-testid="lir-seat-3-status"],
+[data-testid="lir-seat-4-status"],
+[data-testid="lir-seat-5-status"] {
+    display: block;
+    font-size: 10px;
+    font-weight: bold;
+    color: #ff8844;
+    min-height: 13px;
+    letter-spacing: 0.5px;
+}
+
+/* Cards within seats */
+.lir-cards {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin: 5px 0;
+}
+
+.lir-card {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 50px;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+    background: #fff;
+    color: #111;
+    line-height: 1;
+}
+
+/* LIR panels (bet, decision, results) */
+.lir-panel {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.92);
+    border: 1px solid #555;
+    border-radius: 12px;
+    padding: 16px 24px;
+    z-index: 200;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+    min-width: 300px;
+    text-align: center;
+    color: #fff;
+}
+
+.lir-panel label {
+    display: inline-block;
+    margin: 6px 12px 6px 0;
+    color: #ccc;
+    font-size: 14px;
+}
+
+.lir-panel input[type="number"] {
+    width: 90px;
+    padding: 6px 8px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #2a2a3e;
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    margin-left: 6px;
+}
+
+.lir-panel input[type="number"]:focus {
+    outline: none;
+    border-color: #5588ff;
+}
+
+.lir-panel input[type="checkbox"] {
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+[data-testid="lir-total-cost"] {
+    display: block;
+    margin: 8px 0;
+    color: #f0c040;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+[data-testid="lir-human-bankroll"] {
+    display: block;
+    margin: 6px 0;
+    color: #aaa;
+    font-size: 13px;
+}
+
+[data-testid="lir-decision-prompt"] {
+    display: block;
+    font-size: 16px;
+    font-weight: bold;
+    color: #f0c040;
+    margin-bottom: 12px;
+}
+
+[data-testid="lir-hand-name"] {
+    display: block;
+    font-size: 18px;
+    font-weight: bold;
+    color: #f0c040;
+    margin-bottom: 8px;
+}
+
+[data-testid="lir-results-breakdown"] {
+    display: block;
+    font-size: 13px;
+    color: #ccc;
+    margin-bottom: 8px;
+}
+
+[data-testid="lir-results-net"] {
+    display: block;
+    font-size: 22px;
+    font-weight: bold;
+    color: #66ff88;
+    margin-bottom: 12px;
+}
+
+.lir-panel button {
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: white;
+    margin: 4px 6px;
+    transition: opacity 0.1s;
+}
+
+.lir-panel button:hover {
+    opacity: 0.85;
+}
+
+[data-testid="lir-place-bets-btn"] {
+    background: #2d8a4e;
+}
+
+[data-testid="lir-cashout-btn"],
+[data-testid="lir-cashout-btn-result"] {
+    background: #cc8833;
+}
+
+[data-testid="lir-withdraw-btn"] {
+    background: #cc3333;
+}
+
+[data-testid="lir-ride-btn"] {
+    background: #2d8a4e;
+}
+
+[data-testid="lir-next-hand-btn"] {
+    background: #2d8a4e;
+}
+
+/* Pay table */
+.lir-paytable {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+    margin: 420px auto 30px;
+    max-width: 860px;
+    padding: 0 20px;
+    font-size: 12px;
+    color: #ccc;
+}
+
+.lir-paytable h3 {
+    font-size: 13px;
+    color: #f0c040;
+    margin: 0 0 6px 0;
+    text-align: left;
+}
+
+.lir-paytable table {
+    border-collapse: collapse;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 6px;
+    overflow: hidden;
+    min-width: 220px;
+}
+
+.lir-paytable td {
+    padding: 5px 10px;
+    border-bottom: 1px solid #2e2e3e;
+}
+
+.lir-paytable tr:last-child td {
+    border-bottom: none;
+}
+
+.lir-paytable td:last-child {
+    text-align: right;
+    font-weight: bold;
+    color: #88cc88;
+}
+
+/* ============================================================
    Responsive adjustments
    ============================================================ */
 @media (max-width: 980px) {

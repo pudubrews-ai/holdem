@@ -18,6 +18,7 @@
                 <option value="holdem">Texas Hold'em No-Limit</option>
                 <option value="fivecard">5-Card Draw No-Limit</option>
                 <option value="threecard">3-Card Poker</option>
+                <option value="letitride">Let It Ride</option>
             </select>
             <div class="config-error" data-testid="config-error-tournament-type"></div>
         </div>
@@ -463,6 +464,155 @@
         </div>
 
     </div><!-- end #screen-threecard -->
+
+    <!-- Let It Ride Game Screen -->
+    <div id="screen-letitride" data-testid="screen-letitride" style="display:none;">
+
+      <!-- Table header -->
+      <div class="lir-header">
+        <span data-testid="lir-game-label">Let It Ride</span>
+        <span data-testid="lir-hand-number"></span>
+        <span data-testid="lir-table-limits"></span>
+      </div>
+
+      <!-- Community card area -->
+      <div class="lir-community" data-testid="lir-community">
+        <div class="lir-community-card" data-testid="lir-community-card-1"></div>
+        <div class="lir-community-card" data-testid="lir-community-card-2"></div>
+      </div>
+
+      <!-- Player seats (0 = human, 1-5 = AI) -->
+      <div class="lir-seats">
+        <div class="lir-seat" data-testid="lir-seat-0">
+          <span data-testid="lir-seat-0-name"></span>
+          <span data-testid="lir-seat-0-bankroll"></span>
+          <div data-testid="lir-seat-0-cards" class="lir-cards"></div>
+          <span data-testid="lir-seat-0-bet1"></span>
+          <span data-testid="lir-seat-0-bet2"></span>
+          <span data-testid="lir-seat-0-bet3"></span>
+          <span data-testid="lir-seat-0-bonus"></span>
+          <span data-testid="lir-seat-0-result"></span>
+          <span data-testid="lir-seat-0-status"></span>
+        </div>
+        <div class="lir-seat" data-testid="lir-seat-1">
+          <span data-testid="lir-seat-1-name"></span>
+          <span data-testid="lir-seat-1-bankroll"></span>
+          <div data-testid="lir-seat-1-cards" class="lir-cards"></div>
+          <span data-testid="lir-seat-1-bet1"></span>
+          <span data-testid="lir-seat-1-bet2"></span>
+          <span data-testid="lir-seat-1-bet3"></span>
+          <span data-testid="lir-seat-1-bonus"></span>
+          <span data-testid="lir-seat-1-result"></span>
+          <span data-testid="lir-seat-1-status"></span>
+        </div>
+        <div class="lir-seat" data-testid="lir-seat-2">
+          <span data-testid="lir-seat-2-name"></span>
+          <span data-testid="lir-seat-2-bankroll"></span>
+          <div data-testid="lir-seat-2-cards" class="lir-cards"></div>
+          <span data-testid="lir-seat-2-bet1"></span>
+          <span data-testid="lir-seat-2-bet2"></span>
+          <span data-testid="lir-seat-2-bet3"></span>
+          <span data-testid="lir-seat-2-bonus"></span>
+          <span data-testid="lir-seat-2-result"></span>
+          <span data-testid="lir-seat-2-status"></span>
+        </div>
+        <div class="lir-seat" data-testid="lir-seat-3">
+          <span data-testid="lir-seat-3-name"></span>
+          <span data-testid="lir-seat-3-bankroll"></span>
+          <div data-testid="lir-seat-3-cards" class="lir-cards"></div>
+          <span data-testid="lir-seat-3-bet1"></span>
+          <span data-testid="lir-seat-3-bet2"></span>
+          <span data-testid="lir-seat-3-bet3"></span>
+          <span data-testid="lir-seat-3-bonus"></span>
+          <span data-testid="lir-seat-3-result"></span>
+          <span data-testid="lir-seat-3-status"></span>
+        </div>
+        <div class="lir-seat" data-testid="lir-seat-4">
+          <span data-testid="lir-seat-4-name"></span>
+          <span data-testid="lir-seat-4-bankroll"></span>
+          <div data-testid="lir-seat-4-cards" class="lir-cards"></div>
+          <span data-testid="lir-seat-4-bet1"></span>
+          <span data-testid="lir-seat-4-bet2"></span>
+          <span data-testid="lir-seat-4-bet3"></span>
+          <span data-testid="lir-seat-4-bonus"></span>
+          <span data-testid="lir-seat-4-result"></span>
+          <span data-testid="lir-seat-4-status"></span>
+        </div>
+        <div class="lir-seat" data-testid="lir-seat-5">
+          <span data-testid="lir-seat-5-name"></span>
+          <span data-testid="lir-seat-5-bankroll"></span>
+          <div data-testid="lir-seat-5-cards" class="lir-cards"></div>
+          <span data-testid="lir-seat-5-bet1"></span>
+          <span data-testid="lir-seat-5-bet2"></span>
+          <span data-testid="lir-seat-5-bet3"></span>
+          <span data-testid="lir-seat-5-bonus"></span>
+          <span data-testid="lir-seat-5-result"></span>
+          <span data-testid="lir-seat-5-status"></span>
+        </div>
+      </div>
+
+      <!-- Human betting panel (visible during 'betting' phase only) -->
+      <div class="lir-panel" data-testid="lir-bet-panel" style="display:none;">
+        <label>Base Bet:
+          <input type="number" data-testid="lir-base-bet-input" />
+        </label>
+        <label>
+          <input type="checkbox" data-testid="lir-bonus-checkbox" /> Bonus Bet
+        </label>
+        <span data-testid="lir-total-cost"></span>
+        <button data-testid="lir-place-bets-btn">Place Bets</button>
+        <span data-testid="lir-human-bankroll"></span>
+        <button data-testid="lir-cashout-btn">Cash Out</button>
+      </div>
+
+      <!-- Human decision panel (visible during 'first-decision' and 'second-decision') -->
+      <div class="lir-panel" data-testid="lir-decision-panel" style="display:none;">
+        <span data-testid="lir-decision-prompt"></span>
+        <button data-testid="lir-withdraw-btn"></button>
+        <button data-testid="lir-ride-btn">Let It Ride</button>
+      </div>
+
+      <!-- Results panel (visible during 'hand-complete') -->
+      <div class="lir-panel" data-testid="lir-results-panel" style="display:none;">
+        <span data-testid="lir-hand-name"></span>
+        <span data-testid="lir-results-breakdown"></span>
+        <span data-testid="lir-results-net"></span>
+        <button data-testid="lir-next-hand-btn">Next Hand</button>
+        <button data-testid="lir-cashout-btn-result">Cash Out</button>
+      </div>
+
+      <!-- Pay table reference (always visible) -->
+      <div class="lir-paytable" data-testid="lir-paytable">
+        <div class="lir-paytable-main">
+          <h3>Main Pay Table</h3>
+          <table>
+            <tr><td>Royal Flush</td><td>1000:1</td></tr>
+            <tr><td>Straight Flush</td><td>200:1</td></tr>
+            <tr><td>Four of a Kind</td><td>50:1</td></tr>
+            <tr><td>Full House</td><td>11:1</td></tr>
+            <tr><td>Flush</td><td>8:1</td></tr>
+            <tr><td>Straight</td><td>5:1</td></tr>
+            <tr><td>Three of a Kind</td><td>3:1</td></tr>
+            <tr><td>Two Pair</td><td>2:1</td></tr>
+            <tr><td>Pair of 10s or Better</td><td>1:1</td></tr>
+            <tr><td>Low Pair / High Card</td><td>Loss</td></tr>
+          </table>
+        </div>
+        <div class="lir-paytable-bonus">
+          <h3>Bonus Pay Table (3 Cards)</h3>
+          <table>
+            <tr><td>Royal Flush (A-K-Q suited)</td><td>1000:1</td></tr>
+            <tr><td>Straight Flush</td><td>200:1</td></tr>
+            <tr><td>Three of a Kind</td><td>50:1</td></tr>
+            <tr><td>Straight</td><td>6:1</td></tr>
+            <tr><td>Flush</td><td>3:1</td></tr>
+            <tr><td>Pair</td><td>1:1</td></tr>
+            <tr><td>High Card</td><td>Loss</td></tr>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- end #screen-letitride -->
 
     <!-- Game Over Screen -->
     <div id="screen-gameover" data-testid="screen-gameover" style="display: none;">

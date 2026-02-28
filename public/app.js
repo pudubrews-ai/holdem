@@ -11,11 +11,15 @@ let drawSelectedIndices = [];
 // 3-Card Poker polling (separate from tournament polling)
 let threecardPollInterval = null;
 
+// Let It Ride state and polling
+let lirState = null;
+let lirPollInterval = null;
+
 // ============================================================
 // Screen management
 // ============================================================
 function showScreen(name) {
-    var screens = ['screen-config', 'screen-game', 'screen-threecard', 'screen-gameover'];
+    var screens = ['screen-config', 'screen-game', 'screen-threecard', 'screen-letitride', 'screen-gameover'];
     screens.forEach(function(id) {
         document.getElementById(id).style.display = 'none';
     });
@@ -185,7 +189,7 @@ function validateThreecardConfig() {
 function validateConfig() {
     var type = document.querySelector('[data-testid="config-tournament-type"]').value;
 
-    if (type === 'threecard') {
+    if (type === 'threecard' || type === 'letitride') {
         return validateThreecardConfig();
     } else {
         return validateTournamentConfig();
@@ -692,6 +696,10 @@ function updateSpectatorBanner(gameState) {
 // Game over screen
 // ============================================================
 function renderGameOver(gameState) {
+    if (gameState.tournamentType === 'letitride') {
+        render3CGameOver(gameState); // LIR uses the same game-over display as 3-Card Poker
+        return;
+    }
     if (gameState.tournamentType === 'threecard') {
         render3CGameOver(gameState);
         return;
@@ -800,6 +808,12 @@ function stopPolling() {
 // Master render function (tournament + 3-Card routing)
 // ============================================================
 function renderGameState(gameState) {
+    // Route Let It Ride to its own renderer
+    if (gameState.tournamentType === 'letitride') {
+        renderLIRGameState(gameState);
+        return;
+    }
+
     // Route 3-Card Poker to its own renderer
     if (gameState.tournamentType === 'threecard') {
         render3CGameState(gameState);
@@ -1108,8 +1122,10 @@ function render3CGameState(state) {
         var dealerCardEl = document.querySelector('[data-testid="tc-dealer-card-' + i + '"]');
         if (revealDealer && state.dealer.cards && state.dealer.cards[i]) {
             dealerCardEl.textContent = formatCardFace(state.dealer.cards[i]);
+            dealerCardEl.style.color = suitColor(state.dealer.cards[i]);
         } else {
             dealerCardEl.textContent = '[card]';
+            dealerCardEl.style.color = '';
         }
     }
     var dealerStatusEl = document.querySelector('[data-testid="tc-dealer-status"]');
@@ -1130,8 +1146,10 @@ function render3CGameState(state) {
             var cardEl = document.querySelector('[data-testid="tc-seat-' + n + '-card-' + c + '"]');
             if (player.cards && player.cards[c]) {
                 cardEl.textContent = formatCardFace(player.cards[c]);
+                cardEl.style.color = suitColor(player.cards[c]); // RED SUIT FIX
             } else {
                 cardEl.textContent = '';
+                cardEl.style.color = '';
             }
         }
 
@@ -1239,6 +1257,357 @@ function render3CGameState(state) {
 }
 
 // ============================================================
+// Error display utility
+// ============================================================
+function showError(msg) {
+    console.error(msg);
+}
+
+// ============================================================
+// Let It Ride: polling
+// ============================================================
+function startLIRPolling() {
+    if (lirPollInterval) return; // already polling
+    lirPollInterval = setInterval(function() {
+        fetch('/api/game')
+            .then(function(res) {
+                if (!res.ok) return null;
+                return res.json();
+            })
+            .then(function(data) {
+                if (!data) return;
+                renderLIRGameState(data);
+            })
+            .catch(function() {
+                // silently ignore polling errors
+            });
+    }, 1000);
+}
+
+function stopLIRPolling() {
+    if (lirPollInterval) {
+        clearInterval(lirPollInterval);
+        lirPollInterval = null;
+    }
+}
+
+// ============================================================
+// Let It Ride: community card renderer
+// ============================================================
+function renderLIRCommunityCards(state) {
+    var card1El = document.querySelector('[data-testid="lir-community-card-1"]');
+    var card2El = document.querySelector('[data-testid="lir-community-card-2"]');
+
+    // During betting, no cards are dealt yet — show nothing
+    if (state.phase === 'betting') {
+        card1El.textContent = '';
+        card1El.style.color = '';
+        card1El.classList.remove('card-back', 'card-face');
+        card2El.textContent = '';
+        card2El.style.color = '';
+        card2El.classList.remove('card-back', 'card-face');
+        return;
+    }
+
+    if (state.community.card1) {
+        card1El.textContent = formatCardFace(state.community.card1);
+        card1El.style.color = suitColor(state.community.card1);
+        card1El.classList.remove('card-back');
+        card1El.classList.add('card-face');
+    } else {
+        card1El.textContent = '';
+        card1El.style.color = '';
+        card1El.classList.add('card-back');
+        card1El.classList.remove('card-face');
+    }
+
+    if (state.community.card2) {
+        card2El.textContent = formatCardFace(state.community.card2);
+        card2El.style.color = suitColor(state.community.card2);
+        card2El.classList.remove('card-back');
+        card2El.classList.add('card-face');
+    } else {
+        card2El.textContent = '';
+        card2El.style.color = '';
+        card2El.classList.add('card-back');
+        card2El.classList.remove('card-face');
+    }
+}
+
+// ============================================================
+// Let It Ride: seat renderer
+// ============================================================
+function renderLIRSeats(state) {
+    for (var si = 0; si < state.players.length; si++) {
+        var player = state.players[si];
+        var n = player.seatIndex;
+        var prefix = 'lir-seat-' + n;
+
+        // Name
+        var nameEl = document.querySelector('[data-testid="' + prefix + '-name"]');
+        nameEl.textContent = player.name;
+
+        // Bankroll
+        var bankEl = document.querySelector('[data-testid="' + prefix + '-bankroll"]');
+        bankEl.textContent = player.bankroll + ' chips';
+
+        // Cards (3 hole cards, always face-up when present)
+        var cardsEl = document.querySelector('[data-testid="' + prefix + '-cards"]');
+        cardsEl.innerHTML = ''; // safe: clears container before programmatic rebuild
+        if (player.cards) {
+            for (var ci = 0; ci < player.cards.length; ci++) {
+                var card = player.cards[ci];
+                var cardEl = document.createElement('span');
+                cardEl.className = 'lir-card';
+                cardEl.textContent = formatCardFace(card);
+                cardEl.style.color = suitColor(card); // RED SUIT FIX
+                cardsEl.appendChild(cardEl);
+            }
+        }
+
+        // Bet 1
+        var bet1El = document.querySelector('[data-testid="' + prefix + '-bet1"]');
+        if (player.bet1Withdrawn) {
+            bet1El.textContent = 'Bet 1: WITHDRAWN';
+        } else if (player.bet1 > 0) {
+            bet1El.textContent = 'Bet 1: ' + player.bet1;
+        } else {
+            bet1El.textContent = '';
+        }
+
+        // Bet 2
+        var bet2El = document.querySelector('[data-testid="' + prefix + '-bet2"]');
+        if (player.bet2Withdrawn) {
+            bet2El.textContent = 'Bet 2: WITHDRAWN';
+        } else if (player.bet2 > 0) {
+            bet2El.textContent = 'Bet 2: ' + player.bet2;
+        } else {
+            bet2El.textContent = '';
+        }
+
+        // Bet 3
+        var bet3El = document.querySelector('[data-testid="' + prefix + '-bet3"]');
+        if (player.bet3 > 0) {
+            bet3El.textContent = 'Bet 3: ' + player.bet3;
+        } else {
+            bet3El.textContent = '';
+        }
+
+        // Bonus
+        var bonusEl = document.querySelector('[data-testid="' + prefix + '-bonus"]');
+        if (player.bonusBet > 0) {
+            bonusEl.textContent = 'Bonus: ' + player.bonusBet;
+        } else {
+            bonusEl.textContent = '';
+        }
+
+        // Result (shown during hand-complete or game-over)
+        var resultEl = document.querySelector('[data-testid="' + prefix + '-result"]');
+        if (player.handResult && (state.phase === 'hand-complete' || state.phase === 'game-over')) {
+            var net = player.handResult.netChange;
+            var baseBetR = player.bet3;
+            var totalDeductedR = baseBetR * 3 + player.bonusBet;
+            var withdrawalsR = (player.bet1Withdrawn ? baseBetR : 0) + (player.bet2Withdrawn ? baseBetR : 0);
+            var overallPnL = net + withdrawalsR - totalDeductedR;
+            if (overallPnL >= 0) {
+                resultEl.textContent = '+' + overallPnL + ' chips';
+            } else {
+                resultEl.textContent = overallPnL + ' chips';
+            }
+        } else {
+            resultEl.textContent = '';
+        }
+
+        // Status
+        var statusEl = document.querySelector('[data-testid="' + prefix + '-status"]');
+        statusEl.textContent = player.status === 'bust' ? 'BUST' : '';
+    }
+}
+
+// ============================================================
+// Let It Ride: bet panel renderer
+// ============================================================
+function renderLIRBetPanel(state) {
+    var human = null;
+    for (var i = 0; i < state.players.length; i++) {
+        if (state.players[i].seatIndex === 0) { human = state.players[i]; break; }
+    }
+    var input = document.querySelector('[data-testid="lir-base-bet-input"]');
+    var checkbox = document.querySelector('[data-testid="lir-bonus-checkbox"]');
+    var totalEl = document.querySelector('[data-testid="lir-total-cost"]');
+    var bankrollEl = document.querySelector('[data-testid="lir-human-bankroll"]');
+    var cashoutBtn = document.querySelector('[data-testid="lir-cashout-btn"]');
+
+    // Set input constraints
+    input.min = state.config.minBet;
+    input.max = state.config.maxBet;
+    if (!input.value) input.value = state.config.minBet;
+
+    // Update total cost display on input change
+    function updateTotal() {
+        var base = parseInt(input.value) || 0;
+        var bonus = checkbox.checked ? base : 0;
+        totalEl.textContent = 'Total: ' + (base * 3 + bonus) + ' chips';
+    }
+    input.oninput = updateTotal;
+    checkbox.onchange = updateTotal;
+    updateTotal();
+
+    if (human) {
+        bankrollEl.textContent = 'Bankroll: ' + human.bankroll;
+        cashoutBtn.textContent = 'Cash Out (' + human.bankroll + ' chips)';
+    }
+}
+
+// ============================================================
+// Let It Ride: decision panel renderer
+// ============================================================
+function renderLIRDecisionPanel(state) {
+    var human = null;
+    for (var i = 0; i < state.players.length; i++) {
+        if (state.players[i].seatIndex === 0) { human = state.players[i]; break; }
+    }
+    var baseBet = human ? human.bet3 : 0;
+
+    var promptEl = document.querySelector('[data-testid="lir-decision-prompt"]');
+    var withdrawBtn = document.querySelector('[data-testid="lir-withdraw-btn"]');
+
+    if (state.phase === 'first-decision') {
+        promptEl.textContent = 'Withdraw Bet 1?';
+    } else {
+        promptEl.textContent = 'Withdraw Bet 2?';
+    }
+    withdrawBtn.textContent = 'Withdraw (' + baseBet + ' chips back)';
+}
+
+// ============================================================
+// Let It Ride: results panel renderer
+// ============================================================
+function renderLIRResultsPanel(state) {
+    var human = null;
+    for (var i = 0; i < state.players.length; i++) {
+        if (state.players[i].seatIndex === 0) { human = state.players[i]; break; }
+    }
+    if (!human || !human.handResult) return;
+
+    var result = human.handResult;
+    var handNameEl = document.querySelector('[data-testid="lir-hand-name"]');
+    handNameEl.textContent = result.handName;
+
+    // Build breakdown string
+    var baseBet = human.bet3;
+    var parts = [];
+
+    // Bet 1
+    if (result.bet1Result === 'withdrawn') {
+        parts.push('Bet 1: withdrawn');
+    } else if (result.bet1Result === 'win') {
+        parts.push('Bet 1: +' + (baseBet * (result.mainPayout + 1)));
+    } else {
+        parts.push('Bet 1: -' + baseBet);
+    }
+
+    // Bet 2
+    if (result.bet2Result === 'withdrawn') {
+        parts.push('Bet 2: withdrawn');
+    } else if (result.bet2Result === 'win') {
+        parts.push('Bet 2: +' + (baseBet * (result.mainPayout + 1)));
+    } else {
+        parts.push('Bet 2: -' + baseBet);
+    }
+
+    // Bet 3
+    if (result.bet3Result === 'win') {
+        parts.push('Bet 3: +' + (baseBet * (result.mainPayout + 1)));
+    } else {
+        parts.push('Bet 3: -' + baseBet);
+    }
+
+    // Bonus
+    if (result.bonusResult === 'win') {
+        parts.push('Bonus: +' + (human.bonusBet * (result.bonusPayout + 1)));
+    } else if (result.bonusResult === 'loss') {
+        parts.push('Bonus: -' + human.bonusBet);
+    }
+
+    var breakdownEl = document.querySelector('[data-testid="lir-results-breakdown"]');
+    breakdownEl.textContent = parts.join(' | ');
+
+    // Net result (overall P&L from player perspective)
+    var netEl = document.querySelector('[data-testid="lir-results-net"]');
+    var totalDeducted = baseBet * 3 + human.bonusBet;
+    var withdrawals = (human.bet1Withdrawn ? baseBet : 0) + (human.bet2Withdrawn ? baseBet : 0);
+    var overallPnL = result.netChange + withdrawals - totalDeducted;
+    if (overallPnL >= 0) {
+        netEl.textContent = '+' + overallPnL + ' chips';
+    } else {
+        netEl.textContent = overallPnL + ' chips';
+    }
+}
+
+// ============================================================
+// Let It Ride: panel visibility controller
+// ============================================================
+function renderLIRPanels(state) {
+    var betPanel = document.querySelector('[data-testid="lir-bet-panel"]');
+    var decisionPanel = document.querySelector('[data-testid="lir-decision-panel"]');
+    var resultsPanel = document.querySelector('[data-testid="lir-results-panel"]');
+
+    // Hide all
+    betPanel.style.display = 'none';
+    decisionPanel.style.display = 'none';
+    resultsPanel.style.display = 'none';
+
+    if (state.phase === 'betting') {
+        betPanel.style.display = '';
+        renderLIRBetPanel(state);
+    } else if (state.phase === 'first-decision' || state.phase === 'second-decision') {
+        decisionPanel.style.display = '';
+        renderLIRDecisionPanel(state);
+    } else if (state.phase === 'hand-complete') {
+        resultsPanel.style.display = '';
+        renderLIRResultsPanel(state);
+    }
+    // game-over: no panel (handled by showScreen('screen-gameover'))
+}
+
+// ============================================================
+// Let It Ride: master renderer
+// ============================================================
+function renderLIRGameState(state) {
+    lirState = state;
+
+    // Header
+    var handNumEl = document.querySelector('[data-testid="lir-hand-number"]');
+    handNumEl.textContent = 'Hand ' + state.handNumber;
+
+    var limitsEl = document.querySelector('[data-testid="lir-table-limits"]');
+    limitsEl.textContent = 'Min: ' + state.config.minBet + ' | Max: ' + state.config.maxBet;
+
+    // Community cards
+    renderLIRCommunityCards(state);
+
+    // Player seats
+    renderLIRSeats(state);
+
+    // Panel visibility
+    renderLIRPanels(state);
+
+    // Polling control
+    if (state.phase === 'first-decision' || state.phase === 'second-decision') {
+        startLIRPolling();
+    } else {
+        stopLIRPolling();
+    }
+
+    // Game over
+    if (state.phase === 'game-over') {
+        renderGameOver(state);
+        showScreen('gameover');
+    }
+}
+
+// ============================================================
 // Event listeners -- attached once at initialization
 // ============================================================
 
@@ -1248,7 +1617,7 @@ document.querySelector('[data-testid="config-tournament-type"]').addEventListene
     var tournamentFields = document.getElementById('tournament-config-fields');
     var threecardFields = document.getElementById('threecard-config-fields');
 
-    if (type === 'threecard') {
+    if (type === 'threecard' || type === 'letitride') {
         tournamentFields.style.display = 'none';
         threecardFields.style.display = 'block';
         // Clear tournament error divs
@@ -1296,7 +1665,14 @@ document.querySelector('[data-testid="config-start-btn"]').addEventListener('cli
     var type = document.querySelector('[data-testid="config-tournament-type"]').value;
     var body;
 
-    if (type === 'threecard') {
+    if (type === 'letitride') {
+        body = {
+            tournamentType: 'letitride',
+            bankroll: parseInt(document.querySelector('[data-testid="config-bankroll"]').value, 10),
+            minBet: parseInt(document.querySelector('[data-testid="config-min-bet"]').value, 10),
+            maxBet: parseInt(document.querySelector('[data-testid="config-max-bet"]').value, 10)
+        };
+    } else if (type === 'threecard') {
         body = {
             tournamentType: 'threecard',
             bankroll: parseInt(document.querySelector('[data-testid="config-bankroll"]').value, 10),
@@ -1337,7 +1713,10 @@ document.querySelector('[data-testid="config-start-btn"]').addEventListener('cli
         currentGameId = state.gameId;
         previousGameState = null;
 
-        if (state.tournamentType === 'threecard') {
+        if (state.tournamentType === 'letitride') {
+            showScreen('letitride');
+            renderLIRGameState(state);
+        } else if (state.tournamentType === 'threecard') {
             showScreen('threecard');
             render3CGameState(state);
             // Do NOT start polling — initial phase is "betting" which requires human input
@@ -1463,6 +1842,8 @@ document.querySelector('[data-testid="next-hand-btn"]').addEventListener('click'
 document.querySelector('[data-testid="play-again-btn"]').addEventListener('click', function() {
     stopPolling();
     stopThreecardPolling();
+    stopLIRPolling();
+    lirState = null;
     currentGameState = null;
     currentGameId = null;
     previousGameState = null;
@@ -1646,6 +2027,126 @@ document.querySelector('[data-testid="tc-cashout-btn"]').addEventListener('click
         console.error('Network error:', err);
     });
 });
+
+// ============================================================
+// Let It Ride button handlers
+// ============================================================
+
+// Place Bets button
+document.querySelector('[data-testid="lir-place-bets-btn"]').addEventListener('click', function() {
+    var input = document.querySelector('[data-testid="lir-base-bet-input"]');
+    var checkbox = document.querySelector('[data-testid="lir-bonus-checkbox"]');
+    var baseBet = parseInt(input.value);
+    var bonusBet = checkbox.checked;
+
+    fetch('/api/lir-bet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: lirState.gameId, baseBet: baseBet, bonusBet: bonusBet })
+    })
+    .then(function(res) {
+        return res.json().then(function(data) { return { ok: res.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (!result.ok) {
+            showError(result.data.error);
+            return;
+        }
+        renderLIRGameState(result.data);
+        var humanPlayer = null;
+        for (var i = 0; i < result.data.players.length; i++) {
+            if (result.data.players[i].seatIndex === 0) { humanPlayer = result.data.players[i]; break; }
+        }
+        var bankrollEl = document.querySelector('[data-testid="lir-human-bankroll"]');
+        if (bankrollEl && humanPlayer) {
+            bankrollEl.textContent = 'Bankroll: ' + humanPlayer.bankroll;
+        }
+    })
+    .catch(function() {
+        showError('Network error.');
+    });
+});
+
+// Withdraw button
+document.querySelector('[data-testid="lir-withdraw-btn"]').addEventListener('click', function() {
+    var betNumber = lirState.phase === 'first-decision' ? 1 : 2;
+    fetch('/api/lir-decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: lirState.gameId, betNumber: betNumber, decision: 'withdraw' })
+    })
+    .then(function(res) {
+        return res.json().then(function(data) { return { ok: res.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (!result.ok) { showError(result.data.error); return; }
+        renderLIRGameState(result.data);
+    })
+    .catch(function() {
+        showError('Network error.');
+    });
+});
+
+// Let It Ride button
+document.querySelector('[data-testid="lir-ride-btn"]').addEventListener('click', function() {
+    var betNumber = lirState.phase === 'first-decision' ? 1 : 2;
+    fetch('/api/lir-decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: lirState.gameId, betNumber: betNumber, decision: 'ride' })
+    })
+    .then(function(res) {
+        return res.json().then(function(data) { return { ok: res.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (!result.ok) { showError(result.data.error); return; }
+        renderLIRGameState(result.data);
+    })
+    .catch(function() {
+        showError('Network error.');
+    });
+});
+
+// Next Hand button (LIR)
+document.querySelector('[data-testid="lir-next-hand-btn"]').addEventListener('click', function() {
+    fetch('/api/lir-next-hand', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: lirState.gameId })
+    })
+    .then(function(res) {
+        return res.json().then(function(data) { return { ok: res.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (!result.ok) { showError(result.data.error); return; }
+        renderLIRGameState(result.data);
+    })
+    .catch(function() {
+        showError('Network error.');
+    });
+});
+
+// Cash Out handler (shared by both cash-out buttons)
+function handleLIRCashout() {
+    fetch('/api/lir-cashout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: lirState.gameId })
+    })
+    .then(function(res) {
+        return res.json().then(function(data) { return { ok: res.ok, data: data }; });
+    })
+    .then(function(result) {
+        if (!result.ok) { showError(result.data.error); return; }
+        renderLIRGameState(result.data);
+    })
+    .catch(function() {
+        showError('Network error.');
+    });
+}
+
+document.querySelector('[data-testid="lir-cashout-btn"]').addEventListener('click', handleLIRCashout);
+document.querySelector('[data-testid="lir-cashout-btn-result"]').addEventListener('click', handleLIRCashout);
 
 // ============================================================
 // Initial page load

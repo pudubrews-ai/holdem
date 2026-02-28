@@ -1,14 +1,16 @@
-# Poker — Texas Hold'em & 5-Card Draw
+# Poker — Hold'em, 5-Card Draw, 3-Card Poker & Let It Ride
 
-A locally-run, single-page web app supporting No-Limit Texas Hold'em and No-Limit 5-Card Draw. Play against up to 11 AI opponents (or 5 in 5-Card Draw) in a tournament format — last player with chips wins.
+A locally-run, single-page web app supporting four game types: No-Limit Texas Hold'em, No-Limit 5-Card Draw, 3-Card Poker (casino mode), and Let It Ride (casino mode).
 
 ## Features
 
-- **Two game types** — Texas Hold'em No-Limit and 5-Card Draw No-Limit
-- **1–11 AI opponents** (1–5 in 5-Card Draw) — each assigned a random skill tier (loose-passive, tight-aggressive, loose-aggressive) with distinct betting strategies
-- **Full tournament rules** — blinds increase on a configurable schedule, play until one player holds all the chips
-- **Side pot support** — correct multi-player all-in handling with separate side pot calculation
-- **Spectator mode** — when you bust out, watch the AI finish the game
+- **Four game types** — Texas Hold'em No-Limit, 5-Card Draw No-Limit, 3-Card Poker, and Let It Ride
+- **Tournament mode** (Hold'em, 5-Card Draw) — play against up to 11 AI opponents; last player with chips wins
+- **Casino mode** (3-Card Poker, Let It Ride) — play against the house with 5 AI companions; cash out any time
+- **1–11 AI opponents** in tournament mode; 5 AI companions in casino mode — each assigned a random skill tier (loose-passive, tight-aggressive, loose-aggressive)
+- **Full tournament rules** — blinds increase on a configurable schedule, side pot support, spectator mode when you bust
+- **Let It Ride** — place 3 equal bets, withdraw up to 2 as community cards are revealed; optional bonus side bet on your 3 hole cards
+- **3-Card Poker** — ante/play vs dealer, Pair Plus side bet, Six Card Bonus using best 5-of-6 cards
 - **No dependencies on external servers** — runs entirely on your machine
 
 ## Requirements
@@ -38,15 +40,24 @@ PORT=4000 node server.js
 
 Before each game you can set:
 
+**Tournament mode (Hold'em, 5-Card Draw):**
+
 | Setting | Default | Range |
 |---|---|---|
-| Tournament type | Texas Hold'em | Hold'em or 5-Card Draw |
 | Number of AI players | 5 | 1–11 (1–5 for 5-Card Draw) |
 | Starting stack | 1,000 chips | 100–1,000,000 |
 | Hands per blind level | 5 | 1–100 |
 | Blind schedule | 10/20 → 200/400 | min 2 levels |
 
 The blind schedule textarea accepts one level per line in `small/big` format. The last level repeats indefinitely.
+
+**Casino mode (3-Card Poker, Let It Ride):**
+
+| Setting | Default | Range |
+|---|---|---|
+| Starting bankroll | 1,000 chips | 100–1,000,000 |
+| Minimum bet | 5 chips | 1–10,000 |
+| Maximum bet | 500 chips | 1–500,000 |
 
 ## How to Play
 
