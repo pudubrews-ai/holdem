@@ -1614,6 +1614,12 @@ function renderLIRGameState(state) {
 // Tournament type change listener: show/hide field groups and re-validate
 document.querySelector('[data-testid="config-tournament-type"]').addEventListener('change', function() {
     var type = document.querySelector('[data-testid="config-tournament-type"]').value;
+
+    if (type === 'mississippi') {
+        window.location.href = '/mississippi.html';
+        return;
+    }
+
     var tournamentFields = document.getElementById('tournament-config-fields');
     var threecardFields = document.getElementById('threecard-config-fields');
 

@@ -13,7 +13,8 @@
 const SUIT_SYMBOLS = { s: '\u2660', h: '\u2665', d: '\u2666', c: '\u2663' };
 
 function formatCard(cardStr) {
-  return cardStr[0] + (SUIT_SYMBOLS[cardStr[1]] || cardStr[1]);
+  var rank = cardStr[0] === 'T' ? '10' : cardStr[0];
+  return rank + (SUIT_SYMBOLS[cardStr[1]] || cardStr[1]);
 }
 
 function suitColor(cardStr) {
